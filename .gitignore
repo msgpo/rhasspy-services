@@ -1,0 +1,6 @@
+.venv/
+*.log
+__pycache__/
+
+run/profile/
+run/train/

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+gst-launch-1.0 \
+    autoaudiosrc ! \
+    audioconvert ! \
+    audioresample ! \
+    audio/x-raw, rate=16000, channels=1, format=S16LE ! \
+    filesink location=/dev/stdout

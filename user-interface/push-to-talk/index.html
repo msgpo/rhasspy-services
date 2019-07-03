@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+        <!-- CSS -->
+        <link rel="stylesheet" href="/css/bootstrap.min.css">
+
+        <title>Push to Talk</title>
+    </head>
+    <body class="bg-dark">
+        <noscript>
+            <strong>Please enable Javascript to continue.</strong>
+        </noscript>
+
+        <div class="d-flex h-100 text-center">
+            <div id="connected" class="flex-grow-1 bg-danger text-white font-weight-bold p-2">NOT CONNECTED</div>
+        </div>
+
+        <div class="d-flex h-100">
+            <div class="flex-grow-1">
+                <button id="ptt" class="btn w-100">
+                    <img src="/img/microphone.svg" />
+                </button>
+            </div>
+        </div>
+
+        <form onsubmit="return submitChat();" class="form mt-1">
+            <div class="form-group row">
+                <div class="col mr-0 pr-0">
+                    <select class="form-control" id="chat-history">
+                    </select>
+                </div>
+            </div>
+            <div class="form-group row">
+                <div class="col mr-0 pr-0">
+                    <input text="text" class="form-control" id="chat-text">
+                </div>
+                <div class="col-auto ml-1 pl-0">
+                    <button class="btn btn-primary" type="button" onclick="submitChat()">Submit</button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Load Javascript libraries -->
+        <script src="/js/paho-mqtt.min.js"></script>
+        <script src="/js/jquery-3.3.1.slim.min.js"></script>
+        <script src="/js/bootstrap.min.js"></script>
+
+        <script type="text/javascript">
+         var lastButtonColor = null
+
+         var client = null
+
+         var label = 'push-to-talk'
+         var hubHost = location.hostname
+         var hubPort = 1884
+         var pubTopic = 'rhasspy/textCaptured'
+
+         var subTopics = ['rhasspy/textCaptured',
+                          'rhasspy/intentRecognized',
+                          'rhasspy/textToSpeech']
+
+         // -------------------------------------------------------------------
+
+         function init() {
+             var url = new URL(window.location.href)
+             hubHost = url.searchParams.get('host') || hubHost
+             hubPort = url.searchParams.get('port') || hubPort
+             pubTopic = url.searchParams.get('pubTopic')
+             subTopics = url.searchParams.has('subTopic')
+                       ? url.searchParams.getAll('subTopic')
+                       : subTopics
+
+             client = new Paho.Client(hubHost, Number(hubPort), label)
+             $('#label').text(label)
+         }
+
+         // -------------------------------------------------------------------
+
+         function clearButtonColor() {
+             if (lastButtonColor) {
+                 $('#ptt').removeClass(lastButtonColor)
+             }
+
+             lastButtonColor = null
+         }
+
+         function setButtonColor(btnClass) {
+             clearButtonColor()
+             $('#ptt').addClass(btnClass)
+             lastButtonColor = btnClass
+         }
+
+         function connect() {
+             client.onConnectionLost = function(responseObject) {
+                 $('#connected').show()
+             }
+
+             client.onMessageArrived = function(message) {
+                 if (message.topic == 'rhasspy/textCaptured') {
+                     setButtonColor('btn-primary')
+                     payload = JSON.parse(message.payloadString)
+                     if (payload.text.length > 0) {
+                         addToChatHistory(payload.text)
+                     }
+                 } else if (message.topic == 'rhasspy/intentRecognized') {
+                     payload = JSON.parse(message.payloadString)
+                     if (payload.intent.name.length > 0) {
+                         setButtonColor('btn-success')
+                     } else {
+                         setButtonColor('btn-danger')
+                     }
+                 } else if (event_type == 'rhasspy/textToSpeech') {
+                     payload = JSON.parse(message.payloadString)
+                     if (payload.text.length > 0) {
+                         addToChatHistory(payload.text)
+                     }
+                 }
+             }
+
+             client.connect({
+                 reconnect: true,
+                 onSuccess: function() {
+                     $('#connected').hide()
+                     subTopics.forEach(client.subscribe)
+                 }
+             })
+         }
+
+         function sendEvent(topic, payload) {
+             message = new Paho.Message(payload)
+             message.destinationName = topic
+             client.send(message)
+         }
+
+         function submitChat() {
+             try {
+                 setButtonColor('btn-primary')
+                 var text = $("#chat-text").val()
+                 if (text.length > 0) {
+                     addToChatHistory(text)
+                     sendEvent('rhasspy/textCaptured',
+                               JSON.stringify({ 'text': text }))
+                     setButtonColor('btn-success')
+                 }
+             } catch {
+                 setButtonColor('btn-danger')
+             }
+
+             $("#chat-text").val("")
+             return false
+         }
+
+         function addToChatHistory(text) {
+             if (text.length > 0) {
+                 $('#chat-history').append(new Option(text, ''))
+                 $('#chat-history').prop('selectedIndex', $('#chat-history').prop('length') - 1)
+             }
+         }
+
+         // -------------------------------------------------------------------
+
+         $('#ptt').mousedown(function(evt) {
+             setButtonColor('btn-danger')
+             sendEvent('rhasspy/startListening', '')
+         })
+
+         $('#ptt').mouseup(function(evt) {
+             clearButtonColor()
+             sendEvent('rhasspy/stopListening', '')
+         })
+
+         // -------------------------------------------------------------------
+
+         $(function() {
+             init()
+             connect()
+         })
+
+        </script>
+
+        <style type="text/css">
+         .btn {
+             border-radius: 0
+         }
+        </style>
+    </body>
+</html>

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+while true; do
+    mosquitto_sub -t 'rhasspy/audio-out/play-wav' -N -C 1 | paplay
+done
