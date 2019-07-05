@@ -1,7 +1,7 @@
 FROM alpine:latest
 
 RUN apk update
-RUN apk add --no-cache bash netcat-openbsd python3-dev swig
+RUN apk add --no-cache bash netcat-openbsd python3-dev swig mosquitto-clients
 
 COPY download/pocketsphinx-python.tar.gz /download/
 COPY requirements.txt /

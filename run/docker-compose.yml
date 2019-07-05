@@ -1,0 +1,30 @@
+version: '2'
+services:
+  wake:
+    image: rhasspy/wake-word/porcupine
+    volumes:
+      - ./profile:/profile
+    command: --debug --auto-start
+    network_mode: "host"
+    tty: true
+  command:
+    image: rhasspy/voice-detection/webrtcvad
+    volumes:
+      - ./profile:/profile
+    command: --debug
+    network_mode: "host"
+    tty: true
+  stt:
+    image: rhasspy/speech-to-text/pocketsphinx
+    volumes:
+      - ./profile:/profile
+    command: --debug --acoustic-model /profile/acoustic_model --dictionary /profile/dictionary.txt --language-model /profile/language_model.txt
+    network_mode: "host"
+    tty: true
+  intent:
+    image: rhasspy/intent-recognition/fsticuffs
+    volumes:
+      - ./profile:/profile
+    command: --debug --intent-fst /profile/intent.fst
+    network_mode: "host"
+    tty: true

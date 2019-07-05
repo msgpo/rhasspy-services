@@ -6,7 +6,7 @@ command_start_event='rhasspy/voice-command/command-started'
 command_stop_event='rhasspy/voice-command/command-stopped'
 command_timeout_event='rhasspy/voice-command/command-timeout'
 
-nc -ukl 0.0.0.0 5000 | \
+nc -ukl 0.0.0.0 5001 | \
     python /main.py "$@" \
            --events-file <(mosquitto_sub -v -t "${start_event}") \
            --event-start "${start_event}" \

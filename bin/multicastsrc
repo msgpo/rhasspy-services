@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+program_name="$(basename "$0")"
+
+if [[ -z "$2" ]]; then
+    echo "Usage: ${program_name} GROUP PORT"
+    exit 1
+fi
+
+group="$1"
+port="$2"
+
+gst-launch-1.0 \
+    udpsrc multicast-group="${group}" auto-multicast=true port="${port}" ! \
+    rawaudioparse use-sink-caps=false format=pcm pcm-format=s16le sample-rate=16000 num-channels=1 ! \
+    queue ! \
+    audioconvert ! \
+    audioresample ! \
+    filesink location=/dev/stdout

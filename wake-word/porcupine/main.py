@@ -59,6 +59,9 @@ def main():
         default="stop",
     )
     parser.add_argument(
+        "--auto-start", action="store_true", help="Start listening immediately"
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
 
@@ -97,7 +100,7 @@ def main():
         f"Expecting sample rate={handle.sample_rate}, frame length={handle.frame_length}"
     )
 
-    if args.events_file:
+    if args.events_file or args.auto_start:
         listening = False
 
         # Read thread
@@ -133,24 +136,33 @@ def main():
 
         threading.Thread(target=read_audio, daemon=True).start()
 
-        # Wait for start/stop events
-        with open(args.events_file, "r") as events:
-            while True:
-                line = events.readline().strip()
-                if len(line) == 0:
-                    continue
+        if args.auto_start:
+            logging.debug("Automatically started listening")
+            listening = True
 
-                logging.debug(line)
-                topic, event = line.split(" ", maxsplit=1)
-                if topic == args.event_start:
-                    # Clear buffer and start reading
-                    audio_data = bytes()
-                    listening = True
-                    logging.debug("Started listening")
-                elif topic == args.event_stop:
-                    # Stop reading and transcribe
-                    listening = False
-                    logging.debug("Stopped listening")
+        if args.events_file:
+            # Wait for start/stop events
+            with open(args.events_file, "r") as events:
+                while True:
+                    line = events.readline().strip()
+                    if len(line) == 0:
+                        continue
+
+                    logging.debug(line)
+                    topic, event = line.split(" ", maxsplit=1)
+                    if topic == args.event_start:
+                        # Clear buffer and start reading
+                        listening = True
+                        logging.debug("Started listening")
+                    elif topic == args.event_stop:
+                        # Stop reading and transcribe
+                        listening = False
+                        logging.debug("Stopped listening")
+
+        else:
+            # Wait forever
+            threading.Event().wait()
+
     else:
         # Read all data from audio file, process, and stop
         audio_data = audio_file.read()

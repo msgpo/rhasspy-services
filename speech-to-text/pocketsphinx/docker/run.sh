@@ -3,7 +3,7 @@ start_event='rhasspy/speech-to-text/start-listening'
 stop_event='rhasspy/speech-to-text/stop-listening'
 text_event='rhasspy/speech-to-text/text-captured'
 
-nc -ukl 0.0.0.0 5000 | \
+nc -ukl 0.0.0.0 5002 | \
     python /main.py "$@" \
            --events-file <(mosquitto_sub -v -t "${start_event}" -t "${stop_event}") \
            --event-start "${start_event}" \

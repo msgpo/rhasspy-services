@@ -30,7 +30,7 @@ def main():
         "--vad-mode",
         help="Sensitivity (1-3, 3 is most sensitive, default=1)",
         type=int,
-        default=1,
+        default=3,
     )
     parser.add_argument(
         "--min-seconds",
