@@ -55,7 +55,7 @@ def main():
     )
     parser.add_argument(
         "--event-stop",
-        help="Topic to stop reading audio data and transcribe (default=stop)",
+        help="Topic to stop reading audio data (default=stop)",
         default="stop",
     )
     parser.add_argument(
