@@ -119,7 +119,7 @@ def main():
 
                     sys.stdout.flush()
     else:
-        # Read all data from audio file, decoder, and stop
+        # Read all data from audio file, decode, and stop
         audio_data = audio_file.read()
         result = transcribe(decoder, audio_data)
         with jsonlines.Writer(sys.stdout) as out:
