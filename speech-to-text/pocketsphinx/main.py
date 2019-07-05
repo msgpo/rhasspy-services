@@ -47,11 +47,13 @@ def main():
         "--mllr-matrix", help="Path to tuned acoustic model MLLR matrix", default=None
     )
     parser.add_argument(
-        "--event-start", help="Topic to start reading audio data", default="start"
+        "--event-start",
+        help="Topic to start reading audio data (default=start)",
+        default="start",
     )
     parser.add_argument(
         "--event-stop",
-        help="Topic to stop reading audio data and transcribe",
+        help="Topic to stop reading audio data and transcribe (default=stop)",
         default="stop",
     )
     parser.add_argument(
