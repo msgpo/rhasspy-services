@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -e
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+http_host='0.0.0.0'
+http_port='5000'
+
+intent_fst=''
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ "$1" == "--profile" ]]; then
+    profile_dir="$2"
+    profile_yml="${profile_dir}/profile.yml"
+    shift 2
+
+    var_file="$(mktemp)"
+    function finish {
+        rm -f "${var_file}"
+    }
+
+    trap finish EXIT
+
+    export profile_dir
+    yq "${profile_yml}" \
+       -q http_host intent-recognition.fsticuffs.http.host "${http_host}" \
+       -q http_port intent-recognition.fsticuffs.http.port "${http_port}" \
+       -q intent_fst intent-recognition.fsticuffs.intent-fst "${intent_fst}" \
+       > "${var_file}"
+
+    source "${var_file}"
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${intent_fst}" ]]; then
+    args=("$@" '--intent-fst' "${intent_fst}")
+else
+    args=("$@")
+fi
+
+# -----------------------------------------------------------------------------
+# Events FIFO
+# -----------------------------------------------------------------------------
+
+events_fifo="$(mktemp -u)"
+
+function finish {
+    rm -f "${events_fifo}"
+}
+
+trap finish EXIT
+mkfifo "${events_fifo}"
+
+# -----------------------------------------------------------------------------
+
+python /http_server.py --host "${http_host}" --port "${http_port}" \
+       < "${events_fifo}" | \
+    python /main.py "${args[@]}" \
+           > "${events_fifo}"

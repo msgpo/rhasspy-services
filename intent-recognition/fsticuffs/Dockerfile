@@ -1,9 +1,8 @@
 FROM alpine AS builder
 ARG MAKE_THREADS=8
 
-RUN apk update
-RUN apk add build-base
-
+RUN apk update && \
+    apk add build-base
 
 COPY download/openfst-1.6.9.tar.gz /
 RUN tar -xf /openfst-1.6.9.tar.gz && \
@@ -14,8 +13,8 @@ RUN tar -xf /openfst-1.6.9.tar.gz && \
 
 FROM alpine
 
-RUN apk update
-RUN apk add --no-cache bash mosquitto-clients python3-dev jq 
+RUN apk update && \
+    apk add --no-cache bash mosquitto-clients python3-dev jq 
 
 COPY --from=builder /build/bin/* /usr/bin/
 COPY --from=builder /build/lib/*.so* /usr/lib/
@@ -25,6 +24,6 @@ COPY download/jsgf2fst-0.1.1.tar.gz /download/
 COPY requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
-COPY docker/jql /usr/bin/
-COPY main.py docker/run.sh /
-ENTRYPOINT ["bash", "/run.sh"]
+COPY docker/yq docker/mqtt docker/http /usr/bin/
+COPY main.py docker/http_server.py /
+ENTRYPOINT ["bash"]

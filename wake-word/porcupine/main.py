@@ -74,7 +74,7 @@ def main():
 
     audio_file = sys.stdin.buffer
     if args.audio_file:
-        audio_file = open(args.audio_file, "r")
+        audio_file = open(args.audio_file, "rb")
 
     # Ensure each keyword has a sensitivity value
     sensitivities = args.sensitivity

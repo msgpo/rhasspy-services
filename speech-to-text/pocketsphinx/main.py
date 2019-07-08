@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("pocketsphinx")
 
 import os
 import sys
@@ -9,6 +9,7 @@ import jsonlines
 import time
 import argparse
 import threading
+import json
 from typing import Optional, Dict, Any
 
 import pocketsphinx
@@ -25,7 +26,7 @@ def main():
     )
     parser.add_argument(
         "--chunk-size",
-        help="Number of bytes to read from audio file at a time",
+        help="Number of bytes to read from audio file at a time (0 = synchronous read)",
         type=int,
         default=1024,
     )
@@ -65,11 +66,17 @@ def main():
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    logging.debug(args)
+    logger.debug(args)
+
+    # True if audio should be read entirely from a file each time
+    audio_sync = args.chunk_size <= 0
+    if audio_sync and not args.audio_file:
+        logger.fatal("Audio file required if audio sync is on (chunk_size = 0)")
+        sys.exit(1)
 
     audio_file = sys.stdin.buffer
-    if args.audio_file:
-        audio_file = open(args.audio_file, "r")
+    if args.audio_file and not audio_sync:
+        audio_file = open(args.audio_file, "rb")
 
     # Load pocketsphinx decoder
     decoder = get_decoder(args)
@@ -78,21 +85,22 @@ def main():
         listening = False
         audio_data = bytes()
 
-        # Read thread
-        def read_audio():
-            nonlocal listening, audio_data
-            try:
-                while True:
-                    chunk = audio_file.read(args.chunk_size)
-                    if len(chunk) > 0:
-                        if listening:
-                            audio_data += chunk
-                    else:
-                        time.sleep(0.01)
-            except Exception as e:
-                logging.exception("read_audio")
+        # Read thread (asynchronous)
+        if not audio_sync:
+            def read_audio():
+                nonlocal listening, audio_data
+                try:
+                    while True:
+                        chunk = audio_file.read(args.chunk_size)
+                        if len(chunk) > 0:
+                            if listening:
+                                audio_data += chunk
+                        else:
+                            time.sleep(0.01)
+                except Exception as e:
+                    logger.exception("read_audio")
 
-        threading.Thread(target=read_audio, daemon=True).start()
+            threading.Thread(target=read_audio, daemon=True).start()
 
         # Wait for start/stop events
         with open(args.events_file, "r") as events:
@@ -101,21 +109,25 @@ def main():
                 if len(line) == 0:
                     continue
 
-                logging.debug(line)
+                logger.debug(line)
                 topic, event = line.split(" ", maxsplit=1)
                 if topic == args.event_start:
-                    # Clear buffer and start reading
-                    audio_data = bytes()
-                    listening = True
-                    logging.debug("Started listening")
+                    if audio_sync:
+                        with open(args.audio_file, "rb") as audio_file:
+                            # Read entire file
+                            audio_data = audio_file.read()
+                    else:
+                        # Clear buffer and start reading asynchronously
+                        audio_data = bytes()
+                        listening = True
+                        logger.debug("Started listening")
+
                 elif topic == args.event_stop:
                     # Stop reading and transcribe
                     listening = False
-                    logging.debug(
-                        f"Stopped listening. Decoding {len(audio_data)} bytes"
-                    )
+                    logger.debug(f"Stopped listening. Decoding {len(audio_data)} bytes")
                     result = transcribe(decoder, audio_data)
-                    logging.debug(result)
+                    logger.debug(result)
                     with jsonlines.Writer(sys.stdout) as out:
                         out.write(result)
 

@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+import os
+import sys
+import argparse
+import re
+
+import yaml
+import pydash
+
+
+def main():
+    parser = argparse.ArgumentParser("yq")
+    parser.add_argument("file", help="YAML file to load")
+    parser.add_argument(
+        "-q",
+        "--query",
+        action="append",
+        nargs=3,
+        help="Query with var name, path, default",
+    )
+
+    args = parser.parse_args()
+    with open(args.file, "r") as yaml_file:
+        yaml_dict = yaml.safe_load(yaml_file)
+
+    if args.query:
+        for var_name, query_path, query_default in args.query:
+            query_value = pydash.get(yaml_dict, query_path, query_default)
+
+            try:
+                if path_matcher.match(query_value):
+                    query_value = os.path.expandvars(query_value)
+            except:
+                pass
+
+            print(f"{var_name}='{query_value}'")
+
+
+# -----------------------------------------------------------------------------
+
+path_matcher = re.compile(r".*\$\{([^}^{]+)\}.*")
+
+# -----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()

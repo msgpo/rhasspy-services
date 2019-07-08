@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -e
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+mqtt_host='127.0.0.1'
+mqtt_port='1883'
+
+audio_host='0.0.0.0'
+audio_port='5000'
+
+acoustic_model=''
+language_model=''
+dictioary=''
+
+start_event='rhasspy/speech-to-text/start-listening'
+stop_event='rhasspy/speech-to-text/stop-listening'
+text_event='rhasspy/speech-to-text/text-captured'
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ "$1" == "--profile" ]]; then
+    profile_dir="$2"
+    profile_yml="${profile_dir}/profile.yml"
+    shift 2
+
+    var_file="$(mktemp)"
+    function finish {
+        rm -f "${var_file}"
+    }
+
+    trap finish EXIT
+
+    export profile_dir
+    yq "${profile_yml}" \
+       -q mqtt_host mqtt.host "${mqtt_host}" \
+       -q mqtt_port mqtt.port "${mqtt_port}" \
+       -q audio_host audio-input.host "${audio_host}" \
+       -q audio_port audio-input.port "${audio_port}" \
+       -q acoustic_model speech-recognition.pocketsphinx.acoustic-model "${acoustic_model}" \
+       -q language_model speech-recognition.pocketsphinx.language-model "${language_model}" \
+       -q dictionary speech-recognition.pocketsphinx.dictionary "${dictionary}" \
+       -q start_event speech-recognition.mqtt-events.start-listening "${start_event}" \
+       -q stop_event speech-recognition.mqtt-events.stop-listening "${stop_event}" \
+       -q text_event speech-recognition.mqtt-events.text-captured "${text_event}" \
+       > "${var_file}"
+
+    source "${var_file}"
+fi
+
+# -----------------------------------------------------------------------------
+
+args=("$@")
+
+if [[ ! -z "${acoustic_model}" ]]; then
+    args+=('--acoustic-model' "${acoustic_model}")
+fi
+
+if [[ ! -z "${language_model}" ]]; then
+    args+=('--language-model' "${language_model}")
+fi
+
+if [[ ! -z "${dictionary}" ]]; then
+    args+=('--dictionary' "${dictionary}")
+fi
+
+nc -ukl "${audio_host}" "${audio_port}" | \
+    python /main.py "${args[@]}" \
+           --events-file <(mosquitto_sub -v -t "${start_event}" -t "${stop_event}") \
+           --event-start "${start_event}" \
+           --event-stop "${stop_event}" | \
+    mosquitto_pub -l -t "${text_event}"

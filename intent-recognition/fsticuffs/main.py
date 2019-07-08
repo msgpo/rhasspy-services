@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("fsticuffs")
 
 import os
 import sys
-import jsonlines
 import argparse
 import re
+import json
 from typing import Optional, Dict, Any, Set
 
+import jsonlines
 import pywrapfst as fst
 from jsgf2fst import fstaccept
 
@@ -33,28 +34,29 @@ def main():
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
 
-    args = parser.parse_args()
+    args, rest = parser.parse_known_args()
 
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    logging.debug(args)
+    logger.debug(args)
 
     # Load intent fst
     intent_fst = fst.Fst.read(args.intent_fst)
-    logging.debug(f"Loaded FST from {args.intent_fst}")
+    logger.debug(f"Loaded FST from {args.intent_fst}")
 
     # Add symbols from FST
     known_tokens: Optional[Set[str]] = None
 
     if args.skip_unknown:
+        # Ignore words outside of input symbol table
         known_tokens = set()
         in_symbols = intent_fst.input_symbols()
         for i in range(in_symbols.num_symbols()):
             token = in_symbols.find(i).decode()
             known_tokens.add(token)
 
-        logging.debug(f"Skipping words outside of set: {known_tokens}")
+        logger.debug(f"Skipping words outside of set: {known_tokens}")
 
     # Recognize lines from stdin
     for line in sys.stdin:
@@ -62,7 +64,14 @@ def main():
         if len(line) == 0:
             continue
 
-        logging.debug(line)
+        logger.debug(line)
+
+        try:
+            # Try to interpret as JSON
+            request = json.loads(line)
+            line = request["text"]
+        except:
+            pass  # assume line is just text
 
         if args.lower:
             line = line.lower()
@@ -93,7 +102,7 @@ def recognize(
     else:
         intents = []
 
-    logging.debug(f"Recognized {len(intents)} intent(s)")
+    logger.debug(f"Recognized {len(intents)} intent(s)")
 
     # Use first intent
     if len(intents) > 0:
