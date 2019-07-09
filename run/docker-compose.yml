@@ -2,28 +2,71 @@ version: '2'
 services:
   mqtt:
     image: cecep-prime:15555/docker/eclipse-mosquitto
+    ports:
+      - 1883:1883
+      - 1884:1884
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
     tty: true
-  # wake:
-  #   image: rhasspy/wake-word/porcupine
-  #   volumes:
-  #     - ./profile:/profile
-  #   command: --debug --auto-start
-  #   tty: true
-  # command:
-  #   image: rhasspy/voice-detection/webrtcvad
-  #   volumes:
-  #     - ./profile:/profile
-  #   command: --debug
-  #   tty: true
+  microphone:
+    image: rhasspy/audio-input/pulseaudio
+    volumes:
+      - ./profile:/profile
+      - /run/user/1000/pulse:/run/user/1000/pulse
+      - ${HOME}/.config/pulse/cookie:/home/rhasspy/.config/pulse/cookie
+      - /etc/localtime:/etc/localtime:ro
+    command: --profile /profile
+    tty: true
+    depends_on:
+      - mqtt
+  speaker:
+    image: rhasspy/audio-output/pulseaudio
+    volumes:
+      - ./profile:/profile
+      - /run/user/1000/pulse:/run/user/1000/pulse
+      - ${HOME}/.config/pulse/cookie:/home/rhasspy/.config/pulse/cookie
+      - /etc/localtime:/etc/localtime:ro
+    command: mqtt --profile /profile
+    tty: true
+    depends_on:
+      - mqtt
+  wake:
+    image: rhasspy/wake-word/porcupine
+    volumes:
+      - ./profile:/profile
+    command: mqtt --profile /profile -- --auto-start --debug
+    tty: true
+    depends_on:
+      - mqtt
+  command:
+    image: rhasspy/voice-detection/webrtcvad
+    volumes:
+      - ./profile:/profile
+    command: mqtt --profile /profile -- --debug
+    tty: true
+    depends_on:
+      - mqtt
   stt:
     image: rhasspy/speech-to-text/pocketsphinx
     volumes:
       - ./profile:/profile
-    command: mqtt --profile /profile --debug
+    command: mqtt --profile /profile -- --debug
     tty: true
+    depends_on:
+      - mqtt
   intent:
     image: rhasspy/intent-recognition/fsticuffs
     volumes:
       - ./profile:/profile
-    command: mqtt --profile /profile --debug
+    command: mqtt --profile /profile -- --debug
     tty: true
+    depends_on:
+      - mqtt
+  tts:
+    image: rhasspy/text-to-speech/espeak
+    volumes:
+      - ./profile:/profile
+    command: mqtt --profile /profile
+    tty: true
+    depends_on:
+      - mqtt

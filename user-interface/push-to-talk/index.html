@@ -57,11 +57,11 @@
          var label = 'push-to-talk'
          var hubHost = location.hostname
          var hubPort = 1884
-         var pubTopic = 'rhasspy/textCaptured'
+         var pubTopic = 'rhasspy/speech-to-text/text-captured'
 
-         var subTopics = ['rhasspy/textCaptured',
-                          'rhasspy/intentRecognized',
-                          'rhasspy/textToSpeech']
+         var subTopics = ['rhasspy/speech-to-text/text-captured',
+                          'rhasspy/intent-recognition/intent-recognized',
+                          'rhasspy/text-to-speech/speak-text']
 
          // -------------------------------------------------------------------
 
@@ -100,20 +100,20 @@
              }
 
              client.onMessageArrived = function(message) {
-                 if (message.topic == 'rhasspy/textCaptured') {
+                 if (message.topic == 'rhasspy/speech-to-text/text-captured') {
                      setButtonColor('btn-primary')
                      payload = JSON.parse(message.payloadString)
                      if (payload.text.length > 0) {
                          addToChatHistory(payload.text)
                      }
-                 } else if (message.topic == 'rhasspy/intentRecognized') {
+                 } else if (message.topic == 'rhasspy/intent-recognition/intent-recognized') {
                      payload = JSON.parse(message.payloadString)
                      if (payload.intent.name.length > 0) {
                          setButtonColor('btn-success')
                      } else {
                          setButtonColor('btn-danger')
                      }
-                 } else if (event_type == 'rhasspy/textToSpeech') {
+                 } else if (event_type == 'rhasspy/text-to-speech/speak-text') {
                      payload = JSON.parse(message.payloadString)
                      if (payload.text.length > 0) {
                          addToChatHistory(payload.text)
@@ -142,7 +142,7 @@
                  var text = $("#chat-text").val()
                  if (text.length > 0) {
                      addToChatHistory(text)
-                     sendEvent('rhasspy/textCaptured',
+                     sendEvent('rhasspy/speech-to-text/text-captured',
                                JSON.stringify({ 'text': text }))
                      setButtonColor('btn-success')
                  }
@@ -165,12 +165,12 @@
 
          $('#ptt').mousedown(function(evt) {
              setButtonColor('btn-danger')
-             sendEvent('rhasspy/startListening', '')
+             sendEvent('rhasspy/speech-to-text/start-listening', '{}')
          })
 
          $('#ptt').mouseup(function(evt) {
              clearButtonColor()
-             sendEvent('rhasspy/stopListening', '')
+             sendEvent('rhasspy/speech-to-text/stop-listening', '{}')
          })
 
          // -------------------------------------------------------------------

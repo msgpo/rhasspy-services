@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 host="127.0.0.1"
-port="5000"
+port="12101"
 
 if [[ ! -z "$2" ]]; then
     host="$1"

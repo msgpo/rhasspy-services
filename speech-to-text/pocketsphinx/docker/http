@@ -32,9 +32,9 @@ if [[ "$1" == "--profile" ]]; then
     yq "${profile_yml}" \
        -q http_host http.host "${http_host}" \
        -q http_port http.port "${http_port}" \
-       -q acoustic_model speech-recognition.pocketsphinx.acoustic-model "${acoustic_model}" \
-       -q language_model speech-recognition.pocketsphinx.language-model "${language_model}" \
-       -q dictionary speech-recognition.pocketsphinx.dictionary "${dictionary}" \
+       -q acoustic_model speech-to-text.pocketsphinx.acoustic-model "${acoustic_model}" \
+       -q language_model speech-to-text.pocketsphinx.language-model "${language_model}" \
+       -q dictionary speech-to-text.pocketsphinx.dictionary "${dictionary}" \
        > "${var_file}"
 
     source "${var_file}"

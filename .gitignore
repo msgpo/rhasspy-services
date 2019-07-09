@@ -2,5 +2,6 @@
 *.log
 __pycache__/
 
+run/local/
 run/profile/
 run/train/

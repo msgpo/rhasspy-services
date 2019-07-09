@@ -1,2 +1,4 @@
 webrtcvad
 jsonlines
+pyyaml
+pydash

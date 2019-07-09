@@ -4,6 +4,7 @@ RUN apt-get update && \
     apt-get install -y \
         python3 \
         python3-pip \
+        mosquitto-clients \
         pulseaudio \
         gstreamer1.0-pulseaudio \
         gstreamer1.0-tools \
@@ -26,10 +27,9 @@ RUN export UNAME=$UNAME UID=1000 GID=1000 && \
 
 COPY docker/pulseaudio.client.conf /etc/pulse/client.conf
 
-COPY docker/yq /usr/bin/
-
 # Copy script to run
-COPY docker/run.sh docker/shflags /home/${UNAME}/
+COPY docker/yq /usr/bin/
+COPY docker/mqtt docker/shflags /home/${UNAME}/
 
 # Create cookie dir
 RUN mkdir -p /home/${UNAME}/.config/pulse
@@ -43,4 +43,4 @@ USER $UNAME
 ENV HOME /home/${UNAME}
 
 WORKDIR /home/${UNAME}
-ENTRYPOINT ["bash", "run.sh"]
+ENTRYPOINT ["bash"]

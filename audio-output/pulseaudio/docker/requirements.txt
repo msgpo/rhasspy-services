@@ -1,3 +1,2 @@
-jsonlines
 pyyaml
 pydash

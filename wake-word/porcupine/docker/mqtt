@@ -14,9 +14,13 @@ DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
 DEFINE_string 'audio-host' '0.0.0.0' 'Host for UDP audio input stream'
 DEFINE_integer 'audio-port' 5000 'Port for UDP audio input stream'
 
-DEFINE_string 'start-listening' 'rhasspy/speech-to-text/start-listening' 'Topic to start listening to audio stream'
-DEFINE_string 'stop-listening' 'rhasspy/speech-to-text/stop-listening' 'Topic to stop listening to audio stream'
-DEFINE_string 'text-captured' 'rhasspy/speech-to-text/text-captured' 'Topic for transcription response'
+DEFINE_string 'library' '/porcupine/libpv_porcupine.so' 'Path to libpv_porcupine.so'
+DEFINE_string 'model' '/porcupine/porcupine_params.pv' 'Path to porcupine_params.pv'
+DEFINE_string 'keyword' '/porcupine//porcupine.ppn' 'Path to keyword file (.ppn)'
+
+DEFINE_string 'start-listening' 'rhasspy/wake-word/start-listening' 'Topic to start listening to audio stream'
+DEFINE_string 'stop-listening' 'rhasspy/wake-word/stop-listening' 'Topic to stop listening to audio stream'
+DEFINE_string 'detected' 'rhasspy/wake-word/detected' 'Topic for wake word detection event'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -35,13 +39,13 @@ mqtt_port="${FLAGS_mqtt_port}"
 audio_host="${FLAGS_audio_host}"
 audio_port="${FLAGS_audio_port}"
 
-acoustic_model=''
-language_model=''
-dictioary=''
+library="${FLAGS_library}"
+model="${FLAGS_model}"
+keyword="${FLAGS_keyword}"
 
 start_listening="${FLAGS_start_listening}"
 stop_listening="${FLAGS_stop_listening}"
-text_captured="${FLAGS_text_captured}"
+detected="${FLAGS_detected}"
 
 # -----------------------------------------------------------------------------
 # Profile
@@ -51,24 +55,19 @@ if [[ ! -z "${profile_dir}" ]]; then
     profile_yml="${profile_dir}/profile.yml"
 
     var_file="$(mktemp)"
-    function finish {
-        rm -f "${var_file}"
-    }
-
-    trap finish EXIT
-
     export profile_dir
+
     yq "${profile_yml}" \
        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-       -q audio_host 'speech-to-text.audio-input.host' "${audio_host}" \
-       -q audio_port 'speech-to-text.audio-input.port' "${audio_port}" \
-       -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \
-       -q language_model 'speech-to-text.pocketsphinx.language-model' "${language_model}" \
-       -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}" \
-       -q start_listening 'speech-to-text.mqtt-events.start-listening' "${start_listening}" \
-       -q stop_listening 'speech-to-text.mqtt-events.stop-listening' "${stop_listening}" \
-       -q text_captured 'speech-to-text.mqtt-events.text-captured' "${text_captured}" \
+       -q audio_host 'wake-word.audio-input.host' "${audio_host}" \
+       -q audio_port 'wake-word.audio-input.port' "${audio_port}" \
+       -q library 'wake-word.porcupine.library' "${library}" \
+       -q model 'wake-word.porcupine.model' "${model}" \
+       -q keyword 'wake-word.porcupine.keyword' "${keyword}" \
+       -q start_listening 'wake-word.mqtt-events.start-listening' "${start_listening}" \
+       -q stop_listening 'wake-word.mqtt-events.stop-listening' "${stop_listening}" \
+       -q detected 'wake-word.mqtt-events.detected' "${detected}" \
        > "${var_file}"
 
     source "${var_file}"
@@ -76,29 +75,14 @@ fi
 
 # -----------------------------------------------------------------------------
 
-args=()
-
-if [[ ! -z "${acoustic_model}" ]]; then
-    args+=('--acoustic-model' "${acoustic_model}")
-fi
-
-if [[ ! -z "${language_model}" ]]; then
-    args+=('--language-model' "${language_model}")
-fi
-
-if [[ ! -z "${dictionary}" ]]; then
-    args+=('--dictionary' "${dictionary}")
-fi
-
-args+=("$@")
-
-# -----------------------------------------------------------------------------
-
 echo "Expecting UDP audio stream at ${audio_host}:${audio_port}"
 
 nc -ukl "${audio_host}" "${audio_port}" | \
-    python /main.py "${args[@]}" \
+    python /main.py "$@" \
+           --library "${library}" \
+           --model "${model}" \
+           --keyword "${keyword}" \
            --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}" -t "${stop_listening}") \
            --event-start "${start_listening}" \
            --event-stop "${stop_listening}" | \
-    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${text_captured}"
+    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${detected}"

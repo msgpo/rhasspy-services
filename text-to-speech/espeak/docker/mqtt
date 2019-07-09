@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
+DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+
+DEFINE_string 'say-text' 'rhasspy/text-to-speech/say-text' 'Topic for text to speech request'
+DEFINE_string 'play-wav' 'rhasspy/audio-output/play-wav' 'Topic for WAV audio output'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+mqtt_host="${FLAGS_mqtt_host}"
+mqtt_port="${FLAGS_mqtt_port}"
+
+say_text="${FLAGS_say_text}"
+play_wav="${FLAGS_play_wav}"
+
+voice=''
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    profile_yml="${profile_dir}/profile.yml"
+
+    var_file="$(mktemp)"
+    function finish {
+        rm -f "${var_file}"
+    }
+
+    trap finish EXIT
+
+    export profile_dir
+    yq "${profile_yml}" \
+       -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+       -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+       -q say_text 'text-to-speech.mqtt-events.say-text' "${say_text}" \
+       -q voice 'text-to-speech.espeak.voice' "${voice}" \
+       -q play_wav 'audio-output.mqtt-events.play-wav' "${play_wav}" \
+       > "${var_file}"
+
+    source "${var_file}"
+fi
+
+# -----------------------------------------------------------------------------
+
+args=()
+
+if [[ ! -z "${voice}" ]]; then
+    args+=('-v' "${voice}")
+fi
+
+args+=("$@")
+
+mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${say_text}" | \
+    jql '.text' | \
+    while read -r line;
+    do
+        echo "${line}"
+        espeak --stdout "$@" "${line}" | \
+            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_wav}" -s
+    done

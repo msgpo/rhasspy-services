@@ -26,19 +26,21 @@ def main():
     if args.query:
         for var_name, query_path, query_default in args.query:
             query_value = pydash.get(yaml_dict, query_path, query_default)
-
-            try:
-                if path_matcher.match(query_value):
-                    query_value = os.path.expandvars(query_value)
-            except:
-                pass
-
-            print(f"{var_name}='{query_value}'")
+            if isinstance(query_value, list):
+                value_str = " ".join(["'{}'".format(v) for v in query_value])
+                print(f"{var_name}=({value_str})")
+            else:
+                print(f"{var_name}='{query_value}'")
 
 
 # -----------------------------------------------------------------------------
 
-path_matcher = re.compile(r".*\$\{([^}^{]+)\}.*")
+
+def env_constructor(loader, node):
+    return os.path.expandvars(node.value)
+
+
+yaml.SafeLoader.add_constructor("!env", env_constructor)
 
 # -----------------------------------------------------------------------------
 
