@@ -25,5 +25,5 @@ COPY requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
 COPY docker/yq docker/mqtt docker/http /usr/bin/
-COPY main.py docker/http_server.py /
+COPY main.py docker/http_server.py docker/shflags  /
 ENTRYPOINT ["bash"]

@@ -1,26 +1,44 @@
 #!/usr/bin/env bash
-set -e
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
+DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+
+DEFINE_string 'recognize-intent' 'rhasspy/intent-recognition/recognize-intent' 'Topic for intent recognition request'
+DEFINE_string 'intent-recognized' 'rhasspy/intent-recognition/intent-recognized' 'Topic for intent recognition response'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
 
 # -----------------------------------------------------------------------------
 # Default Settings
 # -----------------------------------------------------------------------------
 
-mqtt_host='127.0.0.1'
-mqtt_port='1883'
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+mqtt_host="${FLAGS_mqtt_host}"
+mqtt_port="${FLAGS_mqtt_port}"
 
 intent_fst=''
 
-recognize_event='rhasspy/intent-recognition/recognize-intent'
-recognized_event='rhasspy/intent-recognition/intent-recognized'
+recognize_intent="${FLAGS_recognize_intent}"
+intent_recognized="${FLAGS_intent_recognized}"
 
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
 
-if [[ "$1" == "--profile" ]]; then
-    profile_dir="$2"
+if [[ ! -z "${profile_dir}" ]]; then
     profile_yml="${profile_dir}/profile.yml"
-    shift 2
 
     var_file="$(mktemp)"
     function finish {
@@ -31,11 +49,11 @@ if [[ "$1" == "--profile" ]]; then
 
     export profile_dir
     yq "${profile_yml}" \
-       -q mqtt_host mqtt.host "${mqtt_host}" \
-       -q mqtt_port mqtt.port "${mqtt_port}" \
-       -q intent_fst intent-recognition.fsticuffs.intent-fst "${intent_fst}" \
-       -q recognize_event intent-recognition.mqtt-events.recognize-intent "${recognize_event}" \
-       -q recognized_event intent-recognition.mqtt-events.intent-recognized "${recognized_event}" \
+       -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+       -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+       -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
+       -q recognize_intent 'intent-recognition.mqtt-events.recognize-intent' "${recognize_intent}" \
+       -q intent_recognized 'intent-recognition.mqtt-events.intent-recognized' "${intent_recognized}" \
        > "${var_file}"
 
     source "${var_file}"
@@ -43,12 +61,14 @@ fi
 
 # -----------------------------------------------------------------------------
 
+args=()
+
 if [[ ! -z "${intent_fst}" ]]; then
-    args=("$@" '--intent-fst' "${intent_fst}")
-else
-    args=("$@")
+    args+=('--intent-fst' "${intent_fst}")
 fi
 
-mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${recognize_event}" | \
+args+=("$@")
+
+mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${recognize_intent}" | \
     python /main.py "${args[@]}" | \
-    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${recognized_event}"
+    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${intent_recognized}"
