@@ -53,9 +53,15 @@ fi
 
 # -----------------------------------------------------------------------------
 
+export play_wav
+
+topic_file=$(mktemp)
+export topic_file
+
 while true;
 do
-    mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -C 1 -t "${play_wav}" | \
+    mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -C 1 -v -N -t "${play_wav}/#" | \
+        python3 "${HOME}/filter-topic.py" --topic-file "${topic_file}" | \
         gst-launch-1.0 \
             filesrc location=/dev/stdin ! \
             wavparse ! \
@@ -63,5 +69,6 @@ do
             audioresample ! \
             pulsesink
 
-    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${wav_played}" -m '{}'
+    request_id="$(cat ${topic_file} | sed -e 's|^${play_wav}||')"
+    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${wav_played}${request_id}" -m '{}'
 done

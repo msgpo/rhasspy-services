@@ -70,3 +70,15 @@ services:
     tty: true
     depends_on:
       - mqtt
+  nodered:
+    image: nodered/node-red-docker
+    user: "1000:1000"
+    ports:
+      - 1880:1880
+    volumes:
+      - ./nodered:/data
+      - ./wav:/wav
+    environment:
+      - FLOWS=/data/lib/flows/wake-intent.json
+    depends_on:
+      - mqtt
