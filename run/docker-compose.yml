@@ -66,6 +66,7 @@ services:
     image: rhasspy/text-to-speech/espeak
     volumes:
       - ./profile:/profile
+      - ./wav/cache:/cache
     command: mqtt --profile /profile
     tty: true
     depends_on:
@@ -77,8 +78,12 @@ services:
       - 1880:1880
     volumes:
       - ./nodered:/data
-      - ./wav:/wav
     environment:
       - FLOWS=/data/lib/flows/wake-intent.json
     depends_on:
       - mqtt
+  data:
+    image: cecep-prime:15555/docker/nginx:alpine
+    volumes:
+      - ./wav:/usr/share/nginx/html/wav:ro
+    tty: true

@@ -11,7 +11,10 @@ DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
 
 DEFINE_string 'say-text' 'rhasspy/text-to-speech/say-text' 'Topic for text to speech request'
-DEFINE_string 'play-wav' 'rhasspy/audio-output/play-wav' 'Topic for WAV audio output'
+DEFINE_string 'play-uri' 'rhasspy/audio-output/play-uri' 'Topic for uri audio output'
+
+DEFINE_string 'base-uri' 'http://localhost:8000' 'Base uri for play requests'
+DEFINE_string 'cache-directory' 'cache' 'Directory to cache WAV files'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -28,7 +31,10 @@ mqtt_host="${FLAGS_mqtt_host}"
 mqtt_port="${FLAGS_mqtt_port}"
 
 say_text="${FLAGS_say_text}"
-play_wav="${FLAGS_play_wav}"
+play_uri="${FLAGS_play_uri}"
+
+base_uri="${FLAGS_base_uri}"
+cache_directory="${FLAGS_cache_directory}"
 
 voice=''
 
@@ -52,7 +58,9 @@ if [[ ! -z "${profile_dir}" ]]; then
        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
        -q say_text 'text-to-speech.mqtt-events.say-text' "${say_text}" \
        -q voice 'text-to-speech.espeak.voice' "${voice}" \
-       -q play_wav 'audio-output.mqtt-events.play-wav' "${play_wav}" \
+       -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
+       -q base_uri 'text-to-speech.cache.base-uri' "${base_uri}" \
+       -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
        > "${var_file}"
 
     source "${var_file}"
@@ -68,11 +76,21 @@ fi
 
 args+=("$@")
 
+# Create cache dir
+mkdir -p "${cache_directory}"
+
+# -----------------------------------------------------------------------------
+
 mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${say_text}" | \
-    jql '.text' | \
+    jql -r '.text' | \
     while read -r line;
     do
         echo "${line}"
-        espeak --stdout "$@" "${line}" | \
-            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_wav}" -s
+        filename="$(echo "${line}" | md5sum | awk '{ print $1 }').wav"
+
+        # Cache WAV file
+        espeak --stdout "${args[@]}" "${line}" > "${cache_directory}/${filename}"
+
+        echo -n "${base_uri}/${filename}" | \
+            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_uri}" -s
     done
