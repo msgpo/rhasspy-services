@@ -60,19 +60,36 @@ source "${venv}/bin/activate"
 python3 -m pip install wheel
 
 # -----------------------------------------------------------------------------
+# openfst
+# -----------------------------------------------------------------------------
+
+openfst_dir="${this_dir}/openfst-1.6.9"
+if [[ ! -d "${openfst_dir}" ]]; then
+    tar -xf "${download_dir}/openfst-1.6.9.tar.gz" && \
+        cd "${openfst_dir}" && \
+        ./configure --prefix="${venv}" --enable-far --enable-static --enable-shared --enable-ngram-fsts && \
+        make -j 4
+fi
+
+cd "${openfst_dir}" && make install
+
+# -----------------------------------------------------------------------------
 # jsgf2fst
 # -----------------------------------------------------------------------------
 
-jsgf2fst_file="${download_dir}/jsgf2fst-0.1.0.tar.gz"
+jsgf2fst_file="${download_dir}/jsgf2fst-0.1.1.tar.gz"
 if [[ ! -f "${jsgf2fst_file}" ]]; then
-    jsgf2fst_url='https://github.com/synesthesiam/jsgf2fst/releases/download/v0.1.0/jsgf2fst-0.1.0.tar.gz'
+    jsgf2fst_url='https://github.com/synesthesiam/jsgf2fst/releases/download/v0.1.0/jsgf2fst-0.1.1.tar.gz'
     echo "Downloading jsgf2fst (${jsgf2fst_url})"
     curl -sSfL -o "${jsgf2fst_file}" "${jsgf2fst_url}"
 fi
 
 # -----------------------------------------------------------------------------
 
-cd "${install_dir}" && python3 -m pip install -r "${install_dir}/requirements.txt"
+cd "${install_dir}" && \
+    python3 -m pip install \
+            --global-option=build_ext --global-option="-L${venv}/lib" \
+            -r "${install_dir}/requirements.txt"
 
 # -----------------------------------------------------------------------------
 
