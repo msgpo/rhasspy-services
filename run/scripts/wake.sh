@@ -5,7 +5,7 @@ this_dir="$( cd "$( dirname "$0" )" && pwd )"
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-service_dir="${this_dir}/../../text-to-speech/espeak"
+service_dir="${this_dir}/../../wake-word/porcupine"
 
 . "${this_dir}/shflags"
 
@@ -42,8 +42,12 @@ trap finish EXIT
     "${profile_dir}/profile.yml" \
     -q mqtt_host 'mqtt.host' '' \
     -q mqtt_port 'mqtt.port' '' \
-    -q say_text 'text-to-speech.mqtt-events.say-text' '' \
-    -q voice 'text-to-speech.espeak.voice' '' \
+    -q library 'wake-word.porcupine.library' '' \
+    -q model 'wake-word.porcupine.model' '' \
+    -q keyword 'wake-word.porcupine.keyword' '' \
+    -q start_listening 'wake-word.mqtt-events.start-listening' '' \
+    -q stop_listening 'wake-word.mqtt-events.stop-listening' '' \
+    -q detected 'wake-word.mqtt-events.detected' '' \
     > "${var_file}"
 
 cat "${var_file}"
@@ -51,14 +55,20 @@ source "${var_file}"
 
 # -----------------------------------------------------------------------------
 
-# mqtt -> espeak -> speakers
-mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${say_text}"| \
-    "${this_dir}/jql" -r '.text' | \
-    "${service_dir}/run.sh" | \
-    gst-launch-1.0 \
-        filesrc location=/dev/stdin do-timestamp=true ! \
-        rawaudioparse use-sink-caps=false format=pcm pcm-format=s16le sample-rate=16000 num-channels=1 ! \
-        queue ! \
-        audioconvert ! \
-        audioresample ! \
-        autoaudiosink
+# mic -> wake -> mqtt
+gst-launch-1.0 \
+    autoaudiosrc ! \
+    audioconvert ! \
+    audioresample ! \
+    audio/x-raw, rate=16000, channels=1, format=S16LE ! \
+    filesink location=/dev/stdout | \
+    "${service_dir}/run.sh" \
+        --debug \
+        --auto-start \
+        --library "${library}" \
+        --model "${model}" \
+        --keyword "${keyword}" \
+        --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}" -t "${stop_listening}") \
+        --event-start "${start_listening}" \
+        --event-stop "${stop_listening}" | \
+    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${detected}"

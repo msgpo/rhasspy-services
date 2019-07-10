@@ -5,7 +5,7 @@ this_dir="$( cd "$( dirname "$0" )" && pwd )"
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-service_dir="${this_dir}/../../intent-recognition/fsticuffs"
+service_dir="${this_dir}/../../voice-command/webrtcvad"
 
 . "${this_dir}/shflags"
 
@@ -42,9 +42,12 @@ trap finish EXIT
     "${profile_dir}/profile.yml" \
     -q mqtt_host 'mqtt.host' '' \
     -q mqtt_port 'mqtt.port' '' \
-    -q intent_fst 'intent-recognition.fsticuffs.intent-fst' '' \
-    -q recognize_intent 'intent-recognition.mqtt-events.recognize-intent' '' \
-    -q intent_recognized 'intent-recognition.mqtt-events.intent-recognized' '' \
+    -q start_listening 'voice-command.mqtt-events.start-listening' '' \
+    -q speech 'voice-command.mqtt-events.speech' '' \
+    -q silence 'voice-command.mqtt-events.silence' '' \
+    -q command_started 'voice-command.mqtt-events.command-started' '' \
+    -q command_stopped 'voice-command.mqtt-events.command-stopped' '' \
+    -q command_timeout 'voice-command.mqtt-events.command-timeout' '' \
     > "${var_file}"
 
 cat "${var_file}"
@@ -52,10 +55,23 @@ source "${var_file}"
 
 # -----------------------------------------------------------------------------
 
-# mqtt -> fsticuffs -> mqtt
-mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${recognize_intent}" | \
+# mic -> webrtcvad -> mqtt
+gst-launch-1.0 \
+    autoaudiosrc ! \
+    audioconvert ! \
+    audioresample ! \
+    audio/x-raw, rate=16000, channels=1, format=S16LE ! \
+    filesink location=/dev/stdout | \
     "${service_dir}/run.sh" \
         --debug \
-        --intent-fst "${intent_fst}" \
-        --skip-unknown | \
-    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${intent_recognized}"
+        --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}") \
+        --event-start "${start_listening}" \
+        --event-command-start "${command_started}" \
+        --event-command-stop "${command_stopped}" \
+        --event-command-timeout "${command_timeout}" \
+        --event-speech "${speech}" \
+        --event-silence "${silence}" | \
+    while read -r topic payload;
+    do
+        mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"
+    done

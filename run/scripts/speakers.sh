@@ -5,12 +5,9 @@ this_dir="$( cd "$( dirname "$0" )" && pwd )"
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-service_dir="${this_dir}/../../text-to-speech/espeak"
-
 . "${this_dir}/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
-DEFINE_string 'service' "${service_dir}" 'Path to service directory'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -21,7 +18,6 @@ if [[ -z "${FLAGS_profile}" ]]; then
 fi
 
 profile_dir="$(realpath "${FLAGS_profile}")"
-service_dir="$(realpath "${FLAGS_service}")"
 
 export profile_dir
 
@@ -42,8 +38,8 @@ trap finish EXIT
     "${profile_dir}/profile.yml" \
     -q mqtt_host 'mqtt.host' '' \
     -q mqtt_port 'mqtt.port' '' \
-    -q say_text 'text-to-speech.mqtt-events.say-text' '' \
-    -q voice 'text-to-speech.espeak.voice' '' \
+    -q play_uri 'audio-output.mqtt-events.play-uri' '' \
+    -q uri_played 'audio-output.mqtt-events.uri-played' '' \
     > "${var_file}"
 
 cat "${var_file}"
@@ -51,14 +47,17 @@ source "${var_file}"
 
 # -----------------------------------------------------------------------------
 
-# mqtt -> espeak -> speakers
-mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${say_text}"| \
-    "${this_dir}/jql" -r '.text' | \
-    "${service_dir}/run.sh" | \
-    gst-launch-1.0 \
-        filesrc location=/dev/stdin do-timestamp=true ! \
-        rawaudioparse use-sink-caps=false format=pcm pcm-format=s16le sample-rate=16000 num-channels=1 ! \
-        queue ! \
-        audioconvert ! \
-        audioresample ! \
-        autoaudiosink
+# mqtt -> speakers
+mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${play_uri}/#" | \
+    while read -r topic uri;
+    do
+        echo "${uri}"
+        gst-launch-1.0 \
+            uridecodebin uri="${uri}" ! \
+            pulsesink
+
+        request_id="$(echo "${topic}" | sed -e "s|^${play_uri}||")"
+        echo "${request_id}"
+
+        mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${uri_played}${request_id}" -m '{}'
+    done

@@ -51,13 +51,8 @@ if [[ ! -z "${profile_dir}" ]]; then
     profile_yml="${profile_dir}/profile.yml"
 
     var_file="$(mktemp)"
-    function finish {
-        rm -f "${var_file}"
-    }
-
-    trap finish EXIT
-
     export profile_dir
+
     yq "${profile_yml}" \
        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
        -q mqtt_port 'mqtt.port' "${mqtt_port}" \

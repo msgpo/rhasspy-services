@@ -79,7 +79,7 @@ services:
     volumes:
       - ./nodered:/data
     environment:
-      - FLOWS=/data/lib/flows/wake-intent.json
+      - FLOWS=/data/lib/flows/docker-wake-intent.json
     depends_on:
       - mqtt
   data:

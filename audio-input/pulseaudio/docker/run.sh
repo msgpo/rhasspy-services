@@ -29,13 +29,8 @@ if [[ ! -z "${profile_dir}" ]]; then
     profile_yml="${profile_dir}/profile.yml"
 
     var_file="$(mktemp)"
-    function finish {
-        rm -f "${var_file}"
-    }
-
-    trap finish EXIT
-
     export profile_dir
+
     yq "${profile_yml}" \
        -q clients 'audio-input.pulseaudio.clients' '' \
        > "${var_file}"
