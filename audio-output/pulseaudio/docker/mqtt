@@ -53,8 +53,6 @@ fi
 
 # -----------------------------------------------------------------------------
 
-export play_wav
-
 topic_file=$(mktemp)
 export topic_file
 
@@ -69,6 +67,6 @@ do
             audioresample ! \
             pulsesink
 
-    request_id="$(cat ${topic_file} | sed -e 's|^${play_wav}||')"
+    request_id="$(cat "${topic_file}" | sed -e "s|^${play_wav}||")"
     mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${wav_played}${request_id}" -m '{}'
 done
