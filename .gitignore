@@ -5,3 +5,4 @@ __pycache__/
 run/local/
 run/profile/
 run/train/
+/intent-recognition/fsticuffs/openfst-1.6.9/AUTHORS
