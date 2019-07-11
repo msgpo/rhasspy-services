@@ -51,6 +51,12 @@ if [[ -z "$(python_module distutils.sysconfig)" ]]; then
     install python3-dev
 fi
 
+# mosquitto-clients
+if [[ -z "$(which mosquitto_sub)" ]]; then
+    echo "Installing mosquitto-clients"
+    install mosquitto-clients
+fi
+
 # Set up fresh virtual environment
 venv="${install_dir}/.venv"
 rm -rf "${venv}"
@@ -64,14 +70,17 @@ python3 -m pip install wheel
 # -----------------------------------------------------------------------------
 
 openfst_dir="${this_dir}/openfst-1.6.9"
-if [[ ! -d "${openfst_dir}" ]]; then
+if [[ ! -d "${openfst_dir}/build" ]]; then
     tar -xf "${download_dir}/openfst-1.6.9.tar.gz" && \
         cd "${openfst_dir}" && \
-        ./configure --prefix="${venv}" --enable-far --enable-static --enable-shared --enable-ngram-fsts && \
-        make -j 4
+        ./configure --prefix="${openfst_dir}/build" --enable-far --enable-static --enable-shared --enable-ngram-fsts && \
+        make -j 4 && \
+        make install
 fi
 
-cd "${openfst_dir}" && make install
+cp -R "${openfst_dir}"/build/bin/* "${venv}/bin/"
+cp -R "${openfst_dir}"/build/include/* "${venv}/include/"
+cp -R "${openfst_dir}"/build/lib/*.so* "${venv}/lib/"
 
 # -----------------------------------------------------------------------------
 # jsgf2fst
@@ -89,6 +98,8 @@ fi
 cd "${install_dir}" && \
     python3 -m pip install \
             --global-option=build_ext --global-option="-L${venv}/lib" \
+            "${jsgf2fst_file}" && \
+    python3 -m pip install \
             -r "${install_dir}/requirements.txt"
 
 # -----------------------------------------------------------------------------

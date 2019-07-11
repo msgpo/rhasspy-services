@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 this_dir="$( cd "$( dirname "$0" )" && pwd )"
+
+if [[ ! -z "$1" ]]; then
+    this_dir="$1"
+fi
+
 install_dir="${this_dir}"
 
 # -----------------------------------------------------------------------------
@@ -16,6 +21,10 @@ source "${venv}/bin/activate"
 
 # -----------------------------------------------------------------------------
 
-export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
+# PyInstaller
+if [[ -z "$(which pyinstaller)" ]]; then
+    echo "Installing PyInstaller"
+    python3 -m pip install pyinstaller
+fi
 
-python3 "${this_dir}/main.py" "$@"
+cd "${install_dir}" && pyinstaller fsticuffs.spec --noconfirm

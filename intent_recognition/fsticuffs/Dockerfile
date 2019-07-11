@@ -21,9 +21,16 @@ COPY --from=builder /build/lib/*.so* /usr/lib/
 COPY --from=builder /build/include/ /usr/include/
 
 COPY download/jsgf2fst-0.1.1.tar.gz /download/
+RUN python3 -m pip install --no-cache-dir download/jsgf2fst-0.1.1.tar.gz
+
 COPY requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
-COPY docker/yq docker/mqtt docker/http /usr/bin/
-COPY main.py docker/http_server.py docker/shflags  /
+COPY bin/yq /bin/
+COPY etc/shflags /etc/
+COPY fsticuffs-cli  /
+COPY fsticuffs-mqtt /mqtt
+COPY fsticuffs-http /http
+COPY fsticuffs/ /fsticuffs/
+
 ENTRYPOINT ["bash"]

@@ -1,0 +1,4 @@
+.venv/
+openfst-1.6.9/
+dist/
+build/

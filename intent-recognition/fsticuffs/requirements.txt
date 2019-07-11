@@ -1,4 +1,0 @@
-jsonlines
-pyyaml
-pydash
-download/jsgf2fst-0.1.1.tar.gz

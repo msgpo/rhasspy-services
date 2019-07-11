@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
+this_dir="$( cd "$( dirname "$0" )" && pwd )"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-. "/shflags"
+. "${this_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
 DEFINE_string 'http-host' '0.0.0.0' 'HTTP server address'
 DEFINE_integer 'http-port' 8000 'HTTP server port'
+
+# fsticuffs
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -24,15 +29,17 @@ profile_dir="${FLAGS_profile}"
 http_host="${FLAGS_http_host}"
 http_port="${FLAGS_http_port}"
 
-intent_fst=''
+intent_fst="${FLAGS_intent_fst}"
+
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
 
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_yml="${profile_dir}/profile.yml"
-
     var_file="$(mktemp)"
     function finish {
         rm -f "${var_file}"
@@ -41,18 +48,27 @@ if [[ ! -z "${profile_dir}" ]]; then
     trap finish EXIT
 
     export profile_dir
-    yq "${profile_yml}" \
-       -q http_host 'intent-recognition.fsticuffs.http-server.host' "${http_host}" \
-       -q http_port 'intent-recognition.fsticuffs.http-server.port' "${http_port}" \
-       -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
-       > "${var_file}"
+
+    # Load virtual environment
+    venv="${this_dir}/.venv"
+    if [[ -d "${venv}" ]]; then
+        source "${venv}/bin/activate"
+        export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
+    fi
+
+    python3 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
+            -q http_host 'intent-recognition.fsticuffs.http-server.host' "${http_host}" \
+            -q http_port 'intent-recognition.fsticuffs.http-server.port' "${http_port}" \
+            -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
+            > "${var_file}"
 
     source "${var_file}"
+    finish
 fi
 
 # -----------------------------------------------------------------------------
 
-args=()
+args=("${debug}")
 
 if [[ ! -z "${intent_fst}" ]]; then
     args+=('--intent-fst' "${intent_fst}")
@@ -75,7 +91,7 @@ mkfifo "${events_fifo}"
 
 # -----------------------------------------------------------------------------
 
-python /http_server.py --host "${http_host}" --port "${http_port}" \
-       < "${events_fifo}" | \
-    python /main.py "${args[@]}" \
-           > "${events_fifo}"
+python3 "${this_dir}/fsticuffs/http_server.py" \
+        --host "${http_host}" --port "${http_port}" \
+        < "${events_fifo}" | \
+    "${this_dir}/fsticuffs-cli" "${args[@]}" > "${events_fifo}"
