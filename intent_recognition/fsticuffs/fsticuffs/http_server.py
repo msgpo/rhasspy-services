@@ -40,10 +40,7 @@ def main():
         "--host", help="Host for HTTP server (default=0.0.0.0)", default="0.0.0.0"
     )
     parser.add_argument(
-        "--port",
-        type=int,
-        help="Port for HTTP server (default=5000)",
-        default=5000,
+        "--port", type=int, help="Port for HTTP server (default=5000)", default=5000
     )
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
@@ -56,7 +53,10 @@ def main():
 
     logger.debug(args)
 
-    http.server.HTTPServer((args.host, args.port), Handler).serve_forever()
+    try:
+        http.server.HTTPServer((args.host, args.port), Handler).serve_forever()
+    except KeyboardInterrupt:
+        pass
 
 
 # -----------------------------------------------------------------------------

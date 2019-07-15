@@ -40,13 +40,6 @@ fi
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    var_file="$(mktemp)"
-    function finish {
-        rm -f "${var_file}"
-    }
-
-    trap finish EXIT
-
     export profile_dir
 
     # Load virtual environment
@@ -56,14 +49,12 @@ if [[ ! -z "${profile_dir}" ]]; then
         export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
     fi
 
-    python3 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
-            -q http_host 'intent-recognition.fsticuffs.http-server.host' "${http_host}" \
-            -q http_port 'intent-recognition.fsticuffs.http-server.port' "${http_port}" \
-            -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
-            > "${var_file}"
-
-    source "${var_file}"
-    finish
+    source <(python3 \
+                 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
+                 -q http_host 'intent-recognition.fsticuffs.http-server.host' "${http_host}" \
+                 -q http_port 'intent-recognition.fsticuffs.http-server.port' "${http_port}" \
+                 -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" | \
+                 tee /dev/stderr)
 fi
 
 # -----------------------------------------------------------------------------
@@ -94,4 +85,5 @@ mkfifo "${events_fifo}"
 python3 "${this_dir}/fsticuffs/http_server.py" \
         --host "${http_host}" --port "${http_port}" \
         < "${events_fifo}" | \
-    "${this_dir}/fsticuffs-cli" "${args[@]}" > "${events_fifo}"
+    "${this_dir}/fsticuffs-cli" "${args[@]}" | \
+    tee /dev/stderr > "${events_fifo}"
