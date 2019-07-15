@@ -12,7 +12,7 @@ RUN apt-get update && \
         gstreamer1.0-plugins-good
 
 # Install Python dependencies
-COPY docker/requirements.txt /
+COPY requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
 # Create new user
@@ -29,8 +29,9 @@ RUN export UNAME=$UNAME UID=1000 GID=1000 && \
 COPY docker/pulseaudio.client.conf /etc/pulse/client.conf
 
 # Copy script to run
-COPY docker/yq /usr/bin/
-COPY docker/mqtt docker/shflags /home/${UNAME}/
+COPY bin/yq /home/${UNAME}/bin/
+COPY etc/shflags /home/${UNAME}/etc/
+COPY audio-output-mqtt /home/${UNAME}/
 
 # Create cookie dir
 RUN mkdir -p /home/${UNAME}/.config/pulse
@@ -44,4 +45,4 @@ USER $UNAME
 ENV HOME /home/${UNAME}
 
 WORKDIR /home/${UNAME}
-ENTRYPOINT ["bash"]
+ENTRYPOINT ["bash", "audio-output-mqtt"]

@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
+this_dir="$( cd "$( dirname "$0" )" && pwd )"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-. "${HOME}/shflags"
+. "${this_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
+# MQTT
 DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
 
+# Events
 DEFINE_string 'play-uri' 'rhasspy/audio-output/play-uri' 'Topic to receive uri play requests'
 DEFINE_string 'uri-played' 'rhasspy/audio-output/uri-played' 'Topic to send after uri is played'
 
@@ -36,19 +39,21 @@ uri_played="${FLAGS_uri_played}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_yml="${profile_dir}/profile.yml"
-
-    var_file="$(mktemp)"
     export profile_dir
 
-    yq "${profile_yml}" \
-       -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-       -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-       -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
-       -q uri_played 'audio-output.mqtt-events.uri-played' "${uri_played}" \
-       > "${var_file}"
+    # Load virtual environment
+    venv="${this_dir}/.venv"
+    if [[ -d "${venv}" ]]; then
+        source "${venv}/bin/activate"
+    fi
 
-    source "${var_file}"
+    source <(python3 \
+                 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
+                 -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                 -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                 -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
+                 -q uri_played 'audio-output.mqtt-events.uri-played' "${uri_played}" \
+            tee /dev/stderr)
 fi
 
 # -----------------------------------------------------------------------------
