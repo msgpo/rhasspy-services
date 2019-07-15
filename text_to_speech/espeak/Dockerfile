@@ -8,10 +8,12 @@ RUN apk update && \
         python3 \
         jq
 
-COPY docker/requirements.txt /
+COPY requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
-COPY docker/yq docker/jql /usr/bin/
-COPY docker/mqtt docker/shflags /
+COPY bin/yq bin/jql /bin/
+COPY etc/shflags /etc/
+COPY espeak-mqtt /mqtt
 
+WORKDIR /
 ENTRYPOINT ["bash"]
