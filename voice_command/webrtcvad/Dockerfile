@@ -10,7 +10,10 @@ RUN apk update && \
 COPY requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r requirements.txt
 
-COPY docker/yq /usr/bin/
-COPY main.py docker/mqtt docker/shflags /
+COPY bin/yq /bin/
+COPY etc/shflags /etc/
+COPY webrtcvad-cli /
+COPY webrtcvad-mqtt /mqtt
+COPY webrtcvad_rhasspy /webrtcvad_rhasspy/
 
 ENTRYPOINT ["bash"]

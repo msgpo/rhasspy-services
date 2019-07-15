@@ -7,8 +7,6 @@ if [[ ! -z "$1" ]]; then
 fi
 
 install_dir="$(realpath "${this_dir}")"
-download_dir="${install_dir}/download"
-mkdir -p "${download_dir}"
 
 # -----------------------------------------------------------------------------
 # Debian dependencies
@@ -49,7 +47,7 @@ fi
 venv="${install_dir}/.venv"
 rm -rf "${venv}"
 
-python3 -m venv --system-site-packages "${venv}"
+python3 -m venv "${venv}"
 source "${venv}/bin/activate"
 python3 -m pip install wheel
 
@@ -57,7 +55,8 @@ python3 -m pip install wheel
 # Python Requirements
 # -----------------------------------------------------------------------------
 
-cd "${install_dir}" && python3 -m pip install -r "${install_dir}/requirements.txt"
+cd "${install_dir}" && \
+    python3 -m pip install -r "${install_dir}/requirements.txt"
 
 # -----------------------------------------------------------------------------
 

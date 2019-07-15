@@ -14,3 +14,4 @@ run/wav/cache/
 /intent_recognition/fsticuffs/openfst-1.6.9/
 /intent_recognition/fsticuffs/debian/rhasspy-fsticuffs_1.0_amd64/usr/lib/rhasspy/fsticuffs/
 /speech_to_text/pocketsphinx/debian/rhasspy-pocketsphinx_1.0_amd64/usr/lib/rhasspy/pocketsphinx/
+/voice_command/webrtcvad/debian/rhasspy-webrtcvad_1.0_amd64/usr/lib/rhasspy/webrtcvad/
