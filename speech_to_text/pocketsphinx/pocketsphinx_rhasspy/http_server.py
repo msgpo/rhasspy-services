@@ -74,7 +74,10 @@ def main():
     def make_server(*args, **kwargs):
         return Handler(audio_file, events_file, *args, **kwargs)
 
-    http.server.HTTPServer((args.host, args.port), make_server).serve_forever()
+    try:
+        http.server.HTTPServer((args.host, args.port), make_server).serve_forever()
+    except KeyboardInterrupt:
+        pass
 
 
 # -----------------------------------------------------------------------------

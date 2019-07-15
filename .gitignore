@@ -10,6 +10,7 @@ run/profile/
 run/train/
 run/wav/cache/
 
+*.deb
 /intent_recognition/fsticuffs/openfst-1.6.9/
-/intent_recognition/fsticuffs/debian/*.deb
 /intent_recognition/fsticuffs/debian/rhasspy-fsticuffs_1.0_amd64/usr/lib/rhasspy/fsticuffs/
+/speech_to_text/pocketsphinx/debian/rhasspy-pocketsphinx_1.0_amd64/usr/lib/rhasspy/pocketsphinx/

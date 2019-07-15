@@ -22,4 +22,4 @@ if [[ -z "$(which pyinstaller)" ]]; then
     python3 -m pip install pyinstaller
 fi
 
-cd "${this_dir}" && pyinstaller fsticuffs.spec --noconfirm
+cd "${this_dir}" && pyinstaller pocketsphinx_rhasspy.spec --noconfirm

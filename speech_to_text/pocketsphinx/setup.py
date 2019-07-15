@@ -6,16 +6,16 @@ with open(os.path.join(this_dir, "README.md"), "r") as readme_file:
     long_description = readme_file.read()
 
 setuptools.setup(
-    name="fsticuffs",
+    name="pocketsphinx_rhasspy",
     version="0.1",
     author="Michael Hansen",
     author_email="hansen.mike@gmail.com",
     url="https://github.com/synesthesiam/rhasspy-services",
     packages=setuptools.find_packages(),
-    package_data={"fsticuffs": ["py.typed"]},
-    install_requires=["jsonlines", "pyyaml", "pydash", "jsgf2fst==0.1.1"],
+    package_data={"pocketsphinx_rhasspy": ["py.typed"]},
+    install_requires=["jsonlines", "pyyaml", "pydash", "pocketsphinx"],
     classifiers=["Programming Language :: Python :: 3"],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    entry_points={"console_scripts": ["fsticuffs-cli=fsticuffs.__main__:main"]}
+    entry_points={"console_scripts": ["pocketsphinx-cli=pocketsphinx_rhasspy.__main__:main"]}
 )

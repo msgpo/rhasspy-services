@@ -1,4 +1,0 @@
-jsonlines
-pyyaml
-pydash
-download/pocketsphinx-python.tar.gz
