@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+this_dir="$( cd "$( dirname "$0" )" && pwd )"
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${this_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+DEFINE_string 'clients' '' 'HOST:PORT,HOST:PORT' 'c'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+cli_clients="${FLAGS_clients}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    export profile_dir
+
+    # Load virtual environment
+    venv="${this_dir}/.venv"
+    if [[ -d "${venv}" ]]; then
+        source "${venv}/bin/activate"
+    fi
+
+    source <(python3 \
+                 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
+                 -q clients 'audio-input.pulseaudio.clients' '' \
+            tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+
+clients+=("$@")
+
+export clients
+client_str="$(echo "${clients[@]}" | sed -e 's/ /,/g')"
+
+if [[ ! -z "${cli_clients}" ]]; then
+    client_str="${client_str},${cli_clients}"
+fi
+
+if [[ -z "${client_str}" ]]; then
+    echo "At least one client is required."
+    exit 1
+fi
+
+echo "Sending audio to ${client_str}"
+
+gst-launch-1.0 \
+    pulsesrc ! \
+    audioconvert ! \
+    audioresample ! \
+    audio/x-raw, rate=16000, channels=1, format=S16LE ! \
+    multiudpsink clients="${client_str}"
