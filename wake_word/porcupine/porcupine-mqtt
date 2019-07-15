@@ -1,26 +1,32 @@
 #!/usr/bin/env bash
+this_dir="$( cd "$( dirname "$0" )" && pwd )"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-. "/shflags"
+. "${this_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
+# MQTT
 DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
 
+# Audio
 DEFINE_string 'audio-host' '0.0.0.0' 'Host for UDP audio input stream'
 DEFINE_integer 'audio-port' 5000 'Port for UDP audio input stream'
 
-DEFINE_string 'library' '/porcupine/libpv_porcupine.so' 'Path to libpv_porcupine.so'
-DEFINE_string 'model' '/porcupine/porcupine_params.pv' 'Path to porcupine_params.pv'
-DEFINE_string 'keyword' '/porcupine//porcupine.ppn' 'Path to keyword file (.ppn)'
-
+# Events
 DEFINE_string 'start-listening' 'rhasspy/wake-word/start-listening' 'Topic to start listening to audio stream'
 DEFINE_string 'stop-listening' 'rhasspy/wake-word/stop-listening' 'Topic to stop listening to audio stream'
 DEFINE_string 'detected' 'rhasspy/wake-word/detected' 'Topic for wake word detection event'
+
+# porcupine
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'library' '/porcupine/libpv_porcupine.so' 'Path to libpv_porcupine.so'
+DEFINE_string 'model' '/porcupine/porcupine_params.pv' 'Path to porcupine_params.pv'
+DEFINE_string 'keyword' '/porcupine//porcupine.ppn' 'Path to keyword file (.ppn)'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -43,6 +49,10 @@ library="${FLAGS_library}"
 model="${FLAGS_model}"
 keyword="${FLAGS_keyword}"
 
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
+
 start_listening="${FLAGS_start_listening}"
 stop_listening="${FLAGS_stop_listening}"
 detected="${FLAGS_detected}"
@@ -52,37 +62,46 @@ detected="${FLAGS_detected}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_yml="${profile_dir}/profile.yml"
-
-    var_file="$(mktemp)"
     export profile_dir
 
-    yq "${profile_yml}" \
-       -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-       -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-       -q audio_host 'wake-word.audio-input.host' "${audio_host}" \
-       -q audio_port 'wake-word.audio-input.port' "${audio_port}" \
-       -q library 'wake-word.porcupine.library' "${library}" \
-       -q model 'wake-word.porcupine.model' "${model}" \
-       -q keyword 'wake-word.porcupine.keyword' "${keyword}" \
-       -q start_listening 'wake-word.mqtt-events.start-listening' "${start_listening}" \
-       -q stop_listening 'wake-word.mqtt-events.stop-listening' "${stop_listening}" \
-       -q detected 'wake-word.mqtt-events.detected' "${detected}" \
-       > "${var_file}"
+    # Load virtual environment
+    venv="${this_dir}/.venv"
+    if [[ -d "${venv}" ]]; then
+        source "${venv}/bin/activate"
+        export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
+    fi
 
-    source "${var_file}"
+    source <(python3 \
+                 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
+                 -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                 -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                 -q audio_host 'wake-word.audio-input.host' "${audio_host}" \
+                 -q audio_port 'wake-word.audio-input.port' "${audio_port}" \
+                 -q library 'wake-word.porcupine.library' "${library}" \
+                 -q model 'wake-word.porcupine.model' "${model}" \
+                 -q keyword 'wake-word.porcupine.keyword' "${keyword}" \
+                 -q start_listening 'wake-word.mqtt-events.start-listening' "${start_listening}" \
+                 -q stop_listening 'wake-word.mqtt-events.stop-listening' "${stop_listening}" \
+                 -q detected 'wake-word.mqtt-events.detected' "${detected}" | \
+                 tee /dev/stderr)
 fi
 
 # -----------------------------------------------------------------------------
 
-echo "Expecting UDP audio stream at ${audio_host}:${audio_port}"
+args=("${debug}")
+args+=("$@")
+
+if [[ ! -z "${debug}" ]]; then
+    echo "Expecting UDP audio stream at ${audio_host}:${audio_port}"
+fi
 
 nc -ukl "${audio_host}" "${audio_port}" | \
-    python /main.py "$@" \
+    "${this_dir}/porcupine-cli" "${args[@]}" \
            --library "${library}" \
            --model "${model}" \
            --keyword "${keyword}" \
            --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}" -t "${stop_listening}") \
            --event-start "${start_listening}" \
            --event-stop "${stop_listening}" | \
+    tee /dev/stderr | \
     mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${detected}"
