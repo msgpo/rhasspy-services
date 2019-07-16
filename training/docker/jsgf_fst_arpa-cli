@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+/jsgf_fst_arpa/jsgf_fst_arpa-cli "$@"

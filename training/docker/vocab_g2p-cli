@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+/vocab_g2p/vocab_g2p-cli "$@"
