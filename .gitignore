@@ -23,6 +23,7 @@ run/wav/cache/
 /training/openfst-1.6.9/
 /training/opengrm-ngram-1.3.4/
 /training/phonetisaurus/
+/training/sphinxbase-master/
 
 /training/jsgf_fst_arpa/openfst-1.6.9/
 /training/jsgf_fst_arpa/opengrm-ngram-1.3.4/

@@ -9,7 +9,11 @@ fi
 # -----------------------------------------------------------------------------
 
 # Load virtual environment
-venv="${this_dir}/.venv"
+venv=".venv"
+if [[ ! -d "${venv}" ]]; then
+    venv="${this_dir}/.venv"
+fi
+
 if [[ -d "${venv}" ]]; then
     source "${venv}/bin/activate"
 fi
@@ -22,4 +26,7 @@ if [[ -z "$(which pyinstaller)" ]]; then
     python3 -m pip install pyinstaller
 fi
 
-cd "${this_dir}" && pyinstaller rhasspy_training.spec --noconfirm
+cd "${this_dir}" && \
+    python3 -m pip install --force-reinstall ini_jsgf/ jsgf_fst_arpa/ vocab_dict/ vocab_g2p/ && \
+    pyinstaller rhasspy_training.spec --noconfirm && \
+    python3 -m pip uninstall -y  ini_jsgf jsgf_fst_arpa vocab_dict vocab_g2p

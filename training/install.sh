@@ -71,11 +71,25 @@ if [[ -z "$(python_module venv)" ]]; then
     install python3-venv
 fi
 
-# sphinxbase-utils
-if [[ -z "$(which sphinx_jsgf2fsg)" ]]; then
-    echo "Installing sphinxbase-utils"
-    install sphinxbase-utils
+# autotools
+if [[ -z "$(which autoconf)" || -z "$(which automake)" || -z "$(which libtoolize)" ]]; then
+    echo "Installing autotools"
+    install autoconf automake libtool
 fi
+
+# bison
+if [[ -z "$(which bison)" ]]; then
+    echo "Installing bison"
+    install bison
+fi
+
+# swig
+if [[ -z "$(which swig)" ]]; then
+    echo "Installing swig"
+    install swig
+fi
+
+# -----------------------------------------------------------------------------
 
 if [[ -z "${no_create}" ]]; then
     # Set up fresh virtual environment
@@ -169,6 +183,33 @@ if [[ ! -d "${phonetisaurus_dir}/build" ]]; then
 fi
 
 cp -R "${phonetisaurus_dir}"/build/bin/* "${venv}/bin/"
+
+# -----------------------------------------------------------------------------
+# sphinxbase
+# -----------------------------------------------------------------------------
+
+sphinxbase_dir="${this_dir}/sphinxbase-master"
+if [[ ! -d "${sphinxbase_dir}/build" ]]; then
+    echo "Installing sphinxbase"
+    sphinxbase_file="${download_dir}/sphinxbase.tar.gz"
+
+    if [[ ! -f "${sphinxbase_file}" ]]; then
+        sphinxbase_url='https://github.com/cmusphinx/sphinxbase/master.tar.gz'
+        echo "Downloading sphinxbase (${sphinxbase_url})"
+        download "${sphinxbase_url}" "${sphinxbase_file}"
+    fi
+
+    cd "${this_dir}" && \
+        tar -xf "${sphinxbase_file}" && \
+        cd sphinxbase-master/ && \
+        ./autogen.sh "--prefix=${sphinxbase_dir}/build" && \
+        make -j "${make_threads}" && \
+        make install
+fi
+
+cp -R "${sphinxbase_dir}"/build/bin/* "${venv}/bin/"
+cp -R "${sphinxbase_dir}"/build/lib/*.so* "${venv}/lib/"
+
 
 # -----------------------------------------------------------------------------
 # jsgf2fst

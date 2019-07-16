@@ -4,14 +4,14 @@ ARG MAKE_THREADS=8
 RUN apk update && \
     apk add build-base autoconf libtool automake bison swig
 
-COPY jsgf_fst_arpa/download/openfst-1.6.9.tar.gz /
+COPY download/openfst-1.6.9.tar.gz /
 RUN tar -xf /openfst-1.6.9.tar.gz && \
     cd /openfst-1.6.9 && \
     ./configure --prefix=/build --enable-far --enable-static --enable-shared --enable-ngram-fsts && \
     make -j $MAKE_THREADS && \
     make install
 
-COPY jsgf_fst_arpa/download/opengrm-ngram-1.3.4.tar.gz /
+COPY download/opengrm-ngram-1.3.4.tar.gz /
 RUN cd / && tar -xf opengrm-ngram-1.3.4.tar.gz && \
     cd opengrm-ngram-1.3.4/ && \
     CXXFLAGS=-I/build/include \
@@ -20,23 +20,14 @@ RUN cd / && tar -xf opengrm-ngram-1.3.4.tar.gz && \
     make -j $MAKE_THREADS && \
     make install
 
-COPY jsgf_fst_arpa/download/sphinxbase.tar.gz /
+COPY download/sphinxbase.tar.gz /
 RUN cd / && tar -xf /sphinxbase.tar.gz && \
-    cd sphinxbase/ && \
-    ./autogen.sh && \
-    ./configure --prefix=/build && \
+    cd sphinxbase-master/ && \
+    ./autogen.sh --prefix=/build  && \
     make -j $MAKE_THREADS && \
     make install
 
-COPY jsgf_fst_arpa/download/sphinxtrain.tar.gz /
-RUN cd / && tar -xf /sphinxtrain.tar.gz && \
-    cd sphinxtrain/ && \
-    ./autogen.sh && \
-    ./configure --prefix=/build && \
-    make -j $MAKE_THREADS && \
-    make install
-
-COPY vocab_g2p/download/phonetisaurus-2019.tar.gz /
+COPY load/phonetisaurus-2019.tar.gz /
 RUN tar -xf /phonetisaurus-2019.tar.gz && \
     cd /phonetisaurus/ && \
     ./configure --prefix=/build --with-openfst-includes=/build/include --with-openfst-libs=/build/lib && \
@@ -52,7 +43,7 @@ COPY --from=builder /build/bin/* /usr/bin/
 COPY --from=builder /build/lib/*.so* /usr/lib/
 COPY --from=builder /build/include/ /usr/include/
 
-COPY jsgf_fst_arpa/download/jsgf2fst-0.1.1.tar.gz /
+COPY download/jsgf2fst-0.1.1.tar.gz /
 
 RUN python3 -m pip install --no-cache-dir /jsgf2fst-0.1.1.tar.gz
 

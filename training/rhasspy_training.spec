@@ -17,6 +17,8 @@ a = Analysis(
         (".venv/lib/libngramhist.so.134", "."),
         (".venv/lib/libngram.so.134", "."),
         (".venv/bin/fstminimize", "."),
+        (".venv/lib/libsphinxbase.so.3", "."),
+        (".venv/bin/sphinx_jsgf2fsg", "."),
         (".venv/bin/phonetisaurus-apply", "."),
     ],
     datas=[],
