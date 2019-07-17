@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+if [[ -z "${shflags}" ]]; then
+    echo "Missing shflags"
+    exit 1
+fi
+
+. "${shflags}"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# MQTT
+DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
+DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+
+# Microphone
+DEFINE_string 'audio-host' '0.0.0.0' 'Host for UDP audio input stream'
+DEFINE_integer 'audio-port' 5000 'Port for UDP audio input stream'
+
+# Events
+DEFINE_string 'start-listening' 'rhasspy/speech-to-text/start-listening' 'Topic to start listening to audio stream'
+DEFINE_string 'stop-listening' 'rhasspy/speech-to-text/stop-listening' 'Topic to stop listening to audio stream'
+DEFINE_string 'text-captured' 'rhasspy/speech-to-text/text-captured' 'Topic for transcription response'
+
+# pocketsphinx
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'acoustic-model' '' 'Path to pocketsphinx acoustic model directory (hmm)'
+DEFINE_string 'language-model' '' 'Path to pocketsphinx ARPA language model (lm)'
+DEFINE_string 'dictionary' '' 'Path to pocketsphinx pronunciation dictionary (dict)'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+mqtt_host="${FLAGS_mqtt_host}"
+mqtt_port="${FLAGS_mqtt_port}"
+
+audio_host="${FLAGS_audio_host}"
+audio_port="${FLAGS_audio_port}"
+
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
+
+acoustic_model="${FLAGS_acoustic_model}"
+language_model="${FLAGS_language_model}"
+dictionary="${FLAGS_dictionary}"
+
+start_listening="${FLAGS_start_listening}"
+stop_listening="${FLAGS_stop_listening}"
+text_captured="${FLAGS_text_captured}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    export profile_dir
+    source <(yq "${profile_dir}/profile.yml" \
+                -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                -q audio_host 'speech-to-text.audio-input.host' "${audio_host}" \
+                -q audio_port 'speech-to-text.audio-input.port' "${audio_port}" \
+                -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \
+                -q language_model 'speech-to-text.pocketsphinx.language-model' "${language_model}" \
+                -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}" \
+                -q start_listening 'speech-to-text.mqtt-events.start-listening' "${start_listening}" \
+                -q stop_listening 'speech-to-text.mqtt-events.stop-listening' "${stop_listening}" \
+                -q text_captured 'speech-to-text.mqtt-events.text-captured' "${text_captured}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+
+args=("${debug}")
+
+if [[ ! -z "${acoustic_model}" ]]; then
+    args+=('--acoustic-model' "${acoustic_model}")
+fi
+
+if [[ ! -z "${language_model}" ]]; then
+    args+=('--language-model' "${language_model}")
+fi
+
+if [[ ! -z "${dictionary}" ]]; then
+    args+=('--dictionary' "${dictionary}")
+fi
+
+args+=("$@")
+
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${debug}" ]]; then
+    echo "Expecting UDP audio stream at ${audio_host}:${audio_port}" > /dev/stderr
+fi
+
+nc -ukl "${audio_host}" "${audio_port}" | \
+    pocketsphinx "${args[@]}" \
+           --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}" -t "${stop_listening}") \
+           --event-start "${start_listening}" \
+           --event-stop "${stop_listening}" | \
+    tee /dev/stderr | \
+    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${text_captured}"

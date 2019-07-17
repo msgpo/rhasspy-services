@@ -1,0 +1,195 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+if [[ -z "${shflags}" ]]; then
+    echo "Missing shflags"
+    exit 1
+fi
+
+. "${shflags}"
+
+# kaldi
+DEFINE_string 'kaldi-dir' "${kaldi_dir}" 'Path to kaldi top-level directory'
+DEFINE_string 'model-type' '' 'Type of kaldi model (gmm or nnet3)'
+DEFINE_string 'model-dir' '' 'Directory with kaldi model'
+DEFINE_string 'graph-dir' '' 'Directory with kaldi HCLG.fst (defaults to graph)'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+kaldi_dir="${FLAGS_kaldi_dir}"
+
+if [[ ! -d "${kaldi_dir}" ]]; then
+    echo "Kaldi does not exist at ${kaldi_dir}"
+    exit 1
+fi
+
+model_type="${FLAGS_model_type}"
+
+if [[ -z "${model_type}" ]]; then
+    echo "Model type is required"
+    exit 1
+fi
+
+model_dir="${FLAGS_model_dir}"
+
+if [[ -z "${model_dir}" ]]; then
+    echo "Model directory is required"
+    exit 1
+fi
+
+if [[ ! -d "${model_dir}" ]]; then
+    echo "Model directory does not exist at ${model_dir}"
+    exit 1
+fi
+
+graph_dir="${FLAGS_graph_dir}"
+
+if [[ -z "${graph_dir}" ]]; then
+    graph_dir="${model_dir}/graph"
+fi
+
+# -----------------------------------------------------------------------------
+
+# Need to make all paths absolute
+kaldi_dir="$(realpath "${kaldi_dir}")"
+model_dir="$(realpath "${model_dir}")"
+graph_dir="$(realpath "${graph_dir}")"
+
+lib_dir="${kaldi_dir}/src/lib"
+openfst_dir="${kaldi_dir}/tools/openfst"
+utils_dir="${kaldi_dir}/egs/wsj/s5/utils"
+steps_dir="${kaldi_dir}/egs/wsj/s5/steps"
+
+ln -fs "${utils_dir}" "${model_dir}/utils"
+
+export PATH="${kaldi_dir}/src/featbin:${kaldi_dir}/src/latbin:${kaldi_dir}/src/gmmbin:${kaldi_dir}/src/online2bin:$PATH"
+export LD_LIBRARY_PATH="${lib_dir}:${openfst_dir}/lib:${LD_LIBRARY_PATH}"
+
+# -----------------------------------------------------------------------------
+# WAV files
+# -----------------------------------------------------------------------------
+
+if [[ -z "$1" ]]; then
+    echo "No WAV files given"
+    exit 1
+fi
+
+temp_dir="$(mktemp -d)"
+function finish {
+    rm -rf "${temp_dir}"
+}
+
+trap finish EXIT
+
+# spk2utt
+# wav.scp
+i=1
+while [[ ! -z "$1" ]]; do
+    echo "utt_${i} sox -t wav  \"$(realpath "$1")\" -r 16000 -e signed-integer -b 16 -c 1 -t wav -|" >> "${temp_dir}/wav.scp"
+
+    # Assume from a single speaker
+    echo "corpus utt_${i}" >> "${temp_dir}/spk2utt"
+    shift
+    ((i++))
+done
+
+# -----------------------------------------------------------------------------
+
+function gmm_decode {
+    # make_mfcc
+    compute-mfcc-feats \
+        --config="${model_dir}/conf/mfcc.conf" \
+        "scp:${temp_dir}/wav.scp" \
+        "ark,scp:${temp_dir}/feats.ark,${temp_dir}/feats.scp" \
+        2>&1 > /dev/stderr
+
+    # cmvn
+    compute-cmvn-stats \
+        "scp:${temp_dir}/feats.scp" \
+        "ark,scp:${temp_dir}/cmvn.ark,${temp_dir}/cmvn.scp" \
+        2>&1 > /dev/stderr
+
+    # norm
+    apply-cmvn \
+        "scp:${temp_dir}/cmvn.scp" \
+        "scp:${temp_dir}/feats.scp" \
+        "ark,scp:${temp_dir}/feats_cmvn.ark,${temp_dir}/feats_cmvn.scp" \
+        2>&1 > /dev/stderr
+
+    # add_deltas
+    add-deltas \
+        "scp:${temp_dir}/feats_cmvn.scp" \
+        "ark,scp:${temp_dir}/deltas.ark,${temp_dir}/deltas.scp" \
+        2>&1 > /dev/stderr
+
+    # decode
+    gmm-latgen-faster \
+        --word-symbol-table="${model_dir}/graph/words.txt" \
+        "${model_dir}/model/final.mdl" \
+        "${graph_dir}/HCLG.fst" \
+        "scp:${temp_dir}/deltas.scp" \
+        "ark,scp:${temp_dir}/lattices.ark,${temp_dir}/lattices.scp" \
+        2>&1 > /dev/stderr
+
+    # best path
+    lattice-best-path \
+        --print-args=false \
+        --word-symbol-table="${model_dir}/graph/words.txt" \
+        "ark:${temp_dir}/lattices.ark" \
+        "ark,t:-" | \
+        "${utils_dir}"/int2sym.pl \
+                      -f 2- \
+                      "${graph_dir}/words.txt" - | \
+        grep '^utt_' | \
+        cut -d' ' -f 2-
+}
+
+function nnet3_decode {
+    online_dir="${model_dir}/online"
+    online2-wav-nnet3-latgen-faster \
+        --online=false \
+        --do-endpointing=false \
+        --frame-subsampling-factor=3 \
+        "--config=${online_dir}/conf/online.conf" \
+        --max-active=7000 \
+        --beam=15.0 \
+        --lattice-beam=6.0 \
+        --acoustic-scale=1.0 \
+        "--word-symbol-table=${graph_dir}/words.txt" \
+        "${model_dir}/model/final.mdl" \
+        "${graph_dir}/HCLG.fst" \
+        "ark:${temp_dir}/spk2utt" \
+        "scp:${temp_dir}/wav.scp" \
+        'ark:/dev/null' \
+        2>&1 | \
+        grep '^utt_' | \
+        cut -d' ' -f2-
+}
+
+function to_json {
+    while read -r text;
+    do
+        jq -n --arg t "${text}" '{ text: $t }' | jsonl
+    done
+}
+
+# -----------------------------------------------------------------------------
+
+if [[ "${model_type}" == 'gmm' ]]; then
+    gmm_decode | to_json
+elif [[ "${model_type}" == 'nnet3' ]]; then
+    nnet3_decode | to_json
+else
+    echo "Invalid model type"
+    exit 1
+fi

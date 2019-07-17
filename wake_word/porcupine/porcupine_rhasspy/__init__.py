@@ -13,7 +13,7 @@ import struct
 
 from typing import List
 
-from porcupine import Porcupine
+from .porcupine import Porcupine
 
 # -------------------------------------------------------------------------------------------------
 

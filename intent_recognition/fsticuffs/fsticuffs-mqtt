@@ -50,14 +50,6 @@ intent_recognized="${FLAGS_intent_recognized}"
 
 if [[ ! -z "${profile_dir}" ]]; then
     export profile_dir
-
-    # Load virtual environment
-    venv="${this_dir}/.venv"
-    if [[ -d "${venv}" ]]; then
-        source "${venv}/bin/activate"
-        export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
-    fi
-
     source <(python3 \
                  "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
                  -q mqtt_host 'mqtt.host' "${mqtt_host}" \

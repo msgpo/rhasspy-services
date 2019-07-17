@@ -1,0 +1,6 @@
+jsonlines
+pyyaml
+pydash
+pocketsphinx
+webrtcvad
+pyinstaller

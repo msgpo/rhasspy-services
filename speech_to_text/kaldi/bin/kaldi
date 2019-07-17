@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+args=()
+
+if [[ ! -z "${kaldi_dir}" ]]; then
+    args+=('--kaldi-dir' "${kaldi_dir}")
+fi
+
+args+=("$@")
+
+# -----------------------------------------------------------------------------
+
+python3 -m speech_to_text.kaldi "${args[@]}"

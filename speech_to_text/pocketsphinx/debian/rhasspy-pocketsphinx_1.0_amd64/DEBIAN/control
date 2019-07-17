@@ -1,7 +1,0 @@
-Package: rhasspy-pocketsphinx
-Version: 1.0
-Section: utils
-Priority: optional
-Architecture: amd64
-Maintainer: Michael Hansen
-Description: Pocketsphinx-based speech recognition tool for Rhasspy voice assistant
