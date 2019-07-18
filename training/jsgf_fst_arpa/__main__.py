@@ -5,11 +5,11 @@ logger = logging.getLogger("jsgf_fst_arpa")
 
 import argparse
 
-from jsgf_fst_arpa import make_fst
+from .jsgf_fst_arpa import make_fst
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser("jsgf_fst_arpa")
     parser.add_argument(
         "--grammar-dir", required=True, help="Input directory with JSGF grammars"
     )

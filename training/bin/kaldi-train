@@ -11,9 +11,6 @@ fi
 
 . "${shflags}"
 
-# Events
-# DEFINE_string 'events-file' '' 'File to read events from'
-
 # kaldi
 DEFINE_string 'kaldi-dir' "${kaldi_dir}" 'Path to kaldi top-level directory'
 DEFINE_string 'model-type' '' 'Type of kaldi model (gmm or nnet3)'

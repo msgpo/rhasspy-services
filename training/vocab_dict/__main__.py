@@ -6,11 +6,11 @@ logger = logging.getLogger("vocab_dict")
 import sys
 import argparse
 
-from vocab_dict import make_dict
+from .vocab_dict import make_dict
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser("vocab_dict")
     parser.add_argument("--vocab", required=True, help="Path to vocabulary file")
     parser.add_argument(
         "--dictionary",

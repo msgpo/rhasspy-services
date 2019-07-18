@@ -6,7 +6,7 @@ logger = logging.getLogger("ini_jsgf")
 import sys
 import argparse
 
-from ini_jsgf import make_grammars
+from .ini_jsgf import make_grammars
 
 
 def main():
