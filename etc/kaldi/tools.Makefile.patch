@@ -1,0 +1,2 @@
+136d135
+< 	wget -T 10 -t 3 -O cub-$(CUB_VERSION).zip https://github.com/NVlabs/cub/archive/$(CUB_VERSION).zip

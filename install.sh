@@ -293,15 +293,17 @@ python3 -m pip install \
 kaldi_dir="${build_dir}/kaldi-master"
 if [[ ! -d "${kaldi_dir}/build" ]]; then
     echo "Installing kaldi"
+    install libatlas-dev libatlas3-base
     kaldi_file="${download_dir}/kaldi.tar.gz"
 
     if [[ ! -f "${kaldi_file}" ]]; then
-        kaldi_url='https://github.com/kaldi-asr/kaldi/master.tar.gz'
+        kaldi_url='https://github.com/kaldi-asr/kaldi/archive/master.tar.gz'
         echo "Downloading kaldi (${kaldi_url})"
         download "${kaldi_url}" "${kaldi_file}"
     fi
 
     tar -C "${build_dir}" -xf "${kaldi_file}" && \
+        patch "${kaldi_dir}/tools/Makefile" "${this_dir}/etc/kaldi/tools.Makefile.patch" && \
         cp "${download_dir}/kaldi/*" "${kaldi_dir}/tools/" && \
         cd "${kaldi_dir}/tools" && \
         make -j "${make_threads}" && \
