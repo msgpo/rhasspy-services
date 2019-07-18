@@ -5,7 +5,7 @@ import jsonlines
 
 def main():
     with jsonlines.Writer(sys.stdout) as out:
-        out.write(json.load(sys.stdin))
+        out.write(json.loads(sys.stdin.read().strip()))
 
 # -----------------------------------------------------------------------------
 

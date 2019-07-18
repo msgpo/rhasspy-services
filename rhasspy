@@ -18,9 +18,11 @@ export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
 
 # Gather all the bin paths
 rhasspy_paths=("${venv}/bin" "${this_dir}/bin")
+rhasspy_paths+=("${this_dir}/audio_output/pulseaudio/bin")
 rhasspy_paths+=("${this_dir}/intent_recognition/fsticuffs/bin")
 rhasspy_paths+=("${this_dir}/speech_to_text/pocketsphinx/bin")
 rhasspy_paths+=("${this_dir}/speech_to_text/kaldi/bin")
+rhasspy_paths+=("${this_dir}/text_to_speech/espeak/bin")
 rhasspy_paths+=("${this_dir}/wake_word/porcupine/bin")
 rhasspy_paths+=("${this_dir}/voice_command/webrtcvad/bin")
 rhasspy_paths+=("${this_dir}/training/bin")

@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-this_dir="$( cd "$( dirname "$0" )" && pwd )"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-. "${this_dir}/etc/shflags"
+if [[ -z "${shflags}" ]]; then
+    echo "Missing shflags"
+    exit 1
+fi
+
+. "${shflags}"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -52,24 +56,15 @@ voice="${FLAGS_voice}"
 
 if [[ ! -z "${profile_dir}" ]]; then
     export profile_dir
-
-    # Load virtual environment
-    venv="${this_dir}/.venv"
-    if [[ -d "${venv}" ]]; then
-        source "${venv}/bin/activate"
-        export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
-    fi
-
-    source <(python3 \
-                 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
-                 -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-                 -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                 -q say_text 'text-to-speech.mqtt-events.say-text' "${say_text}" \
-                 -q voice 'text-to-speech.espeak.voice' "${voice}" \
-                 -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
-                 -q base_uri 'text-to-speech.cache.base-uri' "${base_uri}" \
-                 -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
-                 -q voice 'text-to-speech.espeak.voice' "${voice}" | \
+    source <(yq "${profile_dir}/profile.yml" \
+                -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                -q say_text 'text-to-speech.mqtt-events.say-text' "${say_text}" \
+                -q voice 'text-to-speech.espeak.voice' "${voice}" \
+                -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
+                -q base_uri 'text-to-speech.cache.base-uri' "${base_uri}" \
+                -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
+                -q voice 'text-to-speech.espeak.voice' "${voice}" | \
                  tee /dev/stderr)
 fi
 
@@ -88,16 +83,26 @@ mkdir -p "${cache_directory}"
 
 # -----------------------------------------------------------------------------
 
-mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${say_text}" | \
-    "${this_dir}/bin/jql" -r '.text' | \
-    while read -r line;
+# Disable automatic exit on error
+set +e
+
+mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}" | \
+    while read -r topic json;
     do
-        echo "${line}"
-        filename="$(echo "${line}" | md5sum | awk '{ print $1 }').wav"
+        text="$(echo "${json}" | jq '.text')"
+        echo "${text}"
 
         # Cache WAV file
-        espeak --stdout "${args[@]}" "${line}" > "${cache_directory}/${filename}"
+        filename="$(echo "${text}" | md5sum | awk '{ print $1 }').wav"
+        espeak --stdout "${args[@]}" "${text}" > "${cache_directory}/${filename}"
 
-        echo -n "${base_uri}/${filename}" | \
-            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_uri}" -s
+        # Use end of topic as response id
+        request_id="$(echo "${topic}" | sed -e "s|^${say_text}||")"
+
+        jq -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
+            jsonl
+
+        jq -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
+            jsonl | \
+            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_uri}${request_id}" -s
     done

@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-this_dir="$( cd "$( dirname "$0" )" && pwd )"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-. "${this_dir}/etc/shflags"
+if [[ -z "${shflags}" ]]; then
+    echo "Missing shflags"
+    exit 1
+fi
+
+. "${shflags}"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -40,34 +44,36 @@ uri_played="${FLAGS_uri_played}"
 
 if [[ ! -z "${profile_dir}" ]]; then
     export profile_dir
-
-    # Load virtual environment
-    venv="${this_dir}/.venv"
-    if [[ -d "${venv}" ]]; then
-        source "${venv}/bin/activate"
-    fi
-
-    source <(python3 \
-                 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
-                 -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-                 -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                 -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
-                 -q uri_played 'audio-output.mqtt-events.uri-played' "${uri_played}" \
-            tee /dev/stderr)
+    source <(yq "${profile_dir}/profile.yml" \
+                -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
+                -q uri_played 'audio-output.mqtt-events.uri-played' "${uri_played}" | \
+                 tee /dev/stderr)
 fi
 
 # -----------------------------------------------------------------------------
 
+# Disable automatic exit on error
+set +e
+
 mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${play_uri}/#" | \
-    while read -r topic uri;
+    while read -r topic json;
     do
-        echo "${uri}"
-        gst-launch-1.0 \
-            uridecodebin uri="${uri}" ! \
-            pulsesink
+        uri="$(echo -n "${json}" | jq '.uri')"
 
-        request_id="$(echo "${topic}" | sed -e "s|^${play_uri}||")"
-        echo "${request_id}"
+        if [[ ! -z "${uri}" ]]; then
+            echo "${uri}"
 
-        mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${uri_played}${request_id}" -m '{}'
+            # Play URI through speakers
+            gst-launch-1.0 \
+                uridecodebin uri="${uri}" ! \
+                pulsesink
+
+            # Use end of topic as response id
+            request_id="$(echo "${topic}" | sed -e "s|^${play_uri}||")"
+
+            # Report that playback is complete
+            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${uri_played}${request_id}" -m '{}'
+        fi
     done
