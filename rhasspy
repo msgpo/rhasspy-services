@@ -15,6 +15,7 @@ fi
 
 source "${venv}/bin/activate"
 export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
+export PYTHONPATH="${this_dir}"
 
 # Gather all the bin paths
 rhasspy_paths=("${venv}/bin" "${this_dir}/bin")

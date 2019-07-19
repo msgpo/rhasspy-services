@@ -274,9 +274,9 @@ cp -R "${sphinxbase_dir}"/build/lib/*.so* "${venv}/lib/"
 # jsgf2fst
 # -----------------------------------------------------------------------------
 
-jsgf2fst_file="${download_dir}/jsgf2fst-0.1.1.tar.gz"
+jsgf2fst_file="${download_dir}/jsgf2fst-0.1.2.tar.gz"
 if [[ ! -f "${jsgf2fst_file}" ]]; then
-    jsgf2fst_url='https://github.com/synesthesiam/jsgf2fst/releases/download/v0.1.0/jsgf2fst-0.1.1.tar.gz'
+    jsgf2fst_url='https://github.com/synesthesiam/jsgf2fst/releases/download/v0.1.0/jsgf2fst-0.1.2.tar.gz'
     echo "Downloading jsgf2fst (${jsgf2fst_url})"
     download "${jsgf2fst_url}" "${jsgf2fst_file}"
 fi

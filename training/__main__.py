@@ -55,6 +55,7 @@ def main():
         os.path.join(args.output_dir, "language_model.txt"),
         vocab_path=vocab_path,
         fst_dir=os.path.join(args.output_dir, "fsts"),
+        slots_dir=args.slots_dir,
     )
 
     if os.path.exists(unknown_path):
