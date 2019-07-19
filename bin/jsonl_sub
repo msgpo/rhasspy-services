@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+import sys
+import json
+import argparse
+import threading
+import logging
+
+import jsonlines
+import paho.mqtt.client as mqtt
+
+
+def main():
+    parser = argparse.ArgumentParser("jsonl_sub", add_help=False)
+    parser.add_argument(
+        "--help", action="store_true", help="Show this help message and exit."
+    )
+    parser.add_argument(
+        "-h",
+        metavar="host",
+        default="localhost",
+        help="mqtt host to connect to. Defaults to localhost.",
+    )
+    parser.add_argument(
+        "-p",
+        metavar="port",
+        type=int,
+        default=1883,
+        help="network port to connect to. Defaults to 1883.",
+    )
+    parser.add_argument(
+        "-t",
+        metavar="topic",
+        action="append",
+        help="mqtt topic to subscribe to. May be repeated multiple times.",
+    )
+    parser.add_argument(
+        "-v", action="store_true", help="print published messages verbosely."
+    )
+    parser.add_argument(
+        "-C",
+        type=int,
+        metavar="msg_count",
+        default=0,
+        help="disconnect and exit after receiving the 'msg_count' messages.",
+    )
+    args, _ = parser.parse_known_args()
+
+    if args.help:
+        print(parser.format_help())
+        sys.exit(0)
+
+    msg_count = None if args.C <= 0 else args.C
+    logging.basicConfig(level=logging.WARN)
+
+    # Listen for messages
+    client = mqtt.Client()
+
+    def on_connect(client, userdata, flags, rc):
+        try:
+            # Subscribe to topics
+            for topic in args.t:
+                client.subscribe(topic)
+        except Exception as e:
+            logging.exception("on_connect")
+
+    def on_disconnect(client, userdata, flags, rc):
+        try:
+            # Automatically reconnect
+            client.reconnect()
+        except Exception as e:
+            logging.exception("on_disconnect")
+
+    def on_message(client, userdata, msg):
+        if args.v:
+            # Print topic
+            sys.stdout.buffer.write((msg.topic + " ").encode())
+
+        # Print payload as jsonl
+        payload = msg.payload.strip()
+
+        try:
+            # Encode as jsonl
+            with jsonlines.Writer(sys.stdout) as out:
+                out.write(json.loads(payload))
+        except Exception as e:
+            logging.exception("on_message")
+
+            # Print payload as is with newline
+            sys.stdout.buffer.write(payload)
+            sys.stdout.buffer.write("\n".encode())
+
+        sys.stdout.flush()
+
+        # Check message count
+        if msg_count is not None:
+            msg_count -= 1
+            if msg_count <= 0:
+                # Exit after -C messages
+                sys.exit(0)
+
+    # Connect
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
+    client.on_message = on_message
+    client.connect(args.h, args.p)
+
+    try:
+        client.loop_forever()
+    except KeyboardInterrupt:
+        pass
+
+
+# -----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()

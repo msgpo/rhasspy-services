@@ -86,23 +86,23 @@ mkdir -p "${cache_directory}"
 # Disable automatic exit on error
 set +e
 
-mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}" | \
+jsonl_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}/#" | \
     while read -r topic json;
     do
         text="$(echo "${json}" | jq '.text')"
-        echo "${text}"
+        if [[ ! -z "${text}" ]]; then
+            echo "${text}"
 
-        # Cache WAV file
-        filename="$(echo "${text}" | md5sum | awk '{ print $1 }').wav"
-        espeak --stdout "${args[@]}" "${text}" > "${cache_directory}/${filename}"
+            # Cache WAV file
+            filename="$(echo "${text}" | md5sum | awk '{ print $1 }').wav"
+            espeak --stdout "${args[@]}" "${text}" > "${cache_directory}/${filename}"
 
-        # Use end of topic as response id
-        request_id="$(echo "${topic}" | sed -e "s|^${say_text}||")"
+            # Use end of topic as response id
+            request_id="$(echo "${topic}" | sed -e "s|^${say_text}||")"
 
-        jq -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
-            jsonl
-
-        jq -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
-            jsonl | \
-            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_uri}${request_id}" -s
+            # Request playback
+            jq -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
+                jsonl | \
+                mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_uri}${request_id}" -s
+        fi
     done

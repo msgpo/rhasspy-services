@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-this_dir="$( cd "$( dirname "$0" )" && pwd )"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-. "${this_dir}/etc/shflags"
+if [[ -z "${shflags}" ]]; then
+    echo "Missing shflags"
+    exit 1
+fi
+
+. "${shflags}"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -30,16 +34,8 @@ cli_clients="${FLAGS_clients}"
 
 if [[ ! -z "${profile_dir}" ]]; then
     export profile_dir
-
-    # Load virtual environment
-    venv="${this_dir}/.venv"
-    if [[ -d "${venv}" ]]; then
-        source "${venv}/bin/activate"
-    fi
-
-    source <(python3 \
-                 "${this_dir}/bin/yq" "${profile_dir}/profile.yml" \
-                 -q clients 'audio-input.pulseaudio.clients' '' \
+    source <(yq "${profile_dir}/profile.yml" \
+                -q clients 'audio-input.pulseaudio.clients' '' | \
             tee /dev/stderr)
 fi
 

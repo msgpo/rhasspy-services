@@ -1,0 +1,33 @@
+version: '2'
+services:
+  mqtt:
+    image: eclipse-mosquitto
+    tty: true
+  speakers:
+    image: rhasspy/audio-output/pulseaudio
+    volumes:
+      - ./tts_cache:/cache:ro
+      - /run/user/1000/pulse:/run/user/1000/pulse
+      - ${HOME}/.config/pulse/cookie:/home/rhasspy/.config/pulse/cookie
+      - /etc/localtime:/etc/localtime:ro
+    command: --mqtt-host mqtt
+    tty: true
+    depends_on:
+      - mqtt
+  tts:
+    image: rhasspy/text-to-speech/espeak
+    volumes:
+      - ./tts_cache:/cache
+    command: --mqtt-host mqtt --cache-directory /cache --base-uri "file:///cache"
+    tty: true
+    depends_on:
+      - mqtt
+  nodered:
+    image: nodered/node-red-docker
+    user: "1000:1000"
+    ports:
+      - 1880:1880
+    volumes:
+      - ./nodered:/data
+    depends_on:
+      - mqtt

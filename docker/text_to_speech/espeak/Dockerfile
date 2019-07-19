@@ -8,12 +8,16 @@ RUN apk update && \
         python3 \
         jq
 
-COPY requirements.txt /
+ARG PY_DIR=text_to_speech/espeak
+
+COPY ${PY_DIR}/requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
-COPY bin/yq bin/jql /bin/
+COPY bin/yq bin/jsonl bin/jsonl_sub /usr/bin/
 COPY etc/shflags /etc/
-COPY espeak-mqtt /mqtt
+COPY ${PY_DIR}/bin/espeak-mqtt /
+
+ENV shflags=/etc/shflags
 
 WORKDIR /
-ENTRYPOINT ["bash"]
+ENTRYPOINT ["bash", "/espeak-mqtt"]

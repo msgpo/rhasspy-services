@@ -15,7 +15,7 @@ COPY download/pocketsphinx-python.tar.gz /download/
 RUN python3 -m pip install --no-cache-dir download/pocketsphinx-python.tar.gz
 
 COPY ${PY_DIR}/requirements.txt /
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
+RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
 COPY bin/yq /usr/bin/
 COPY etc/shflags /etc/

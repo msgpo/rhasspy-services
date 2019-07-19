@@ -5,15 +5,20 @@ RUN apt-get update && \
         python3 \
         python3-pip \
         mosquitto-clients \
-        bbe \
+        jq \
         pulseaudio \
         gstreamer1.0-pulseaudio \
         gstreamer1.0-tools \
         gstreamer1.0-plugins-good
 
+ARG PY_DIR=audio_output/pulseaudio
+
 # Install Python dependencies
-COPY requirements.txt /
+COPY ${PY_DIR}/requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
+
+COPY bin/yq bin/jsonl_sub /usr/bin/
+COPY etc/shflags /etc/
 
 # Create new user
 ENV UNAME=rhasspy
@@ -26,12 +31,10 @@ RUN export UNAME=$UNAME UID=1000 GID=1000 && \
     chmod 0440 /etc/sudoers.d/${UNAME} && \
     gpasswd -a ${UNAME} audio
 
-COPY docker/pulseaudio.client.conf /etc/pulse/client.conf
+COPY ${PY_DIR}/docker/pulseaudio.client.conf /etc/pulse/client.conf
 
 # Copy script to run
-COPY bin/yq /home/${UNAME}/bin/
-COPY etc/shflags /home/${UNAME}/etc/
-COPY audio-output-mqtt /home/${UNAME}/
+COPY ${PY_DIR}/bin/pulseaudio-output-mqtt /home/${UNAME}/
 
 # Create cookie dir
 RUN mkdir -p /home/${UNAME}/.config/pulse
@@ -43,6 +46,7 @@ RUN export UNAME=$UNAME UID=1000 GID=1000 && \
 # Switch to new user
 USER $UNAME
 ENV HOME /home/${UNAME}
+ENV shflags=/etc/shflags
 
 WORKDIR /home/${UNAME}
-ENTRYPOINT ["bash", "audio-output-mqtt"]
+ENTRYPOINT ["bash", "pulseaudio-output-mqtt"]
