@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-__version__ = "0.1"
+__version__ = "3.0"
 
 import logging
 
@@ -46,6 +46,7 @@ def recognize(
             intent["intents"].append(other_intent)
     else:
         intent = empty_intent()
+        intent["text"] = text
 
     return intent
 
