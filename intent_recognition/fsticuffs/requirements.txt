@@ -2,3 +2,4 @@ jsonlines
 pyyaml
 pydash
 jsgf2fst==0.1.1
+networkx

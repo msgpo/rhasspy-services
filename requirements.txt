@@ -5,3 +5,4 @@ pocketsphinx
 webrtcvad
 pyinstaller
 paho-mqtt
+networkx

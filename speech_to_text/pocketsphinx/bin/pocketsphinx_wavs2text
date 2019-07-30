@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -e
+temp_dir="$(mktemp -d)"
+audio="${temp_dir}/audio.txt"
+events="${temp_dir}/events.txt"
+
+function cleanup {
+    rm -rf "${temp_dir}"
+}
+trap cleanup EXIT
+
+touch "${audio}" "${events}"
+
+while read -r wav_path;
+do
+    echo 'start {}' >> "${events}"
+
+    wav_name="$(basename "${wav_path}")"
+    audio_path="${temp_dir}/${wav_name}.raw"
+    sox -t wav "${wav_path}" -t raw -r 16000 -e signed-integer -c 1 "${audio_path}"
+    echo "${audio_path}" >> "${audio}"
+
+    stop_data="$(jq -n -c --arg p "${wav_path}" --arg n "${wav_name}" '{ wav_path:$p, wav_name:$n }')"
+    echo "stop ${stop_data}" >> "${events}"
+done
+
+python3 -m speech_to_text.pocketsphinx \
+        --audio-file "${audio}" \
+        --audio-file-lines \
+        --events-file "${events}" \
+        --event-start 'start' \
+        --event-stop 'stop' \
+        "$@"

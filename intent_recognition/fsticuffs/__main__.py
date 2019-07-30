@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any, Set
 import jsonlines
 import pywrapfst as fst
 
-from .fsticuffs import recognize, empty_intent
+from .fsticuffs import recognize, empty_intent, fst_to_graph, recognize_fuzzy
 
 # -------------------------------------------------------------------------------------------------
 
@@ -29,6 +29,9 @@ def main():
     )
     parser.add_argument(
         "--lower", action="store_true", help="Automatically lower-case input text"
+    )
+    parser.add_argument(
+        "--fuzzy", action="store_true", help="Use fuzzy search (slower)"
     )
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
@@ -58,6 +61,11 @@ def main():
 
         logger.debug(f"Skipping words outside of set: {known_tokens}")
 
+    intent_graph = None
+    if args.fuzzy:
+        logger.debug("Fuzzy search enabled")
+        intent_graph = fst_to_graph(intent_fst)
+
     # Recognize lines from stdin
     try:
         for line in sys.stdin:
@@ -77,7 +85,12 @@ def main():
             if args.lower:
                 line = line.lower()
 
-            intent = recognize(intent_fst, line, known_tokens)
+            if args.fuzzy:
+                # Fuzzy search
+                intent = recognize_fuzzy(intent_graph, line, known_tokens)
+            else:
+                # Fast (strict) search
+                intent = recognize(intent_fst, line, known_tokens)
 
             # Output to stdout
             with jsonlines.Writer(sys.stdout) as out:

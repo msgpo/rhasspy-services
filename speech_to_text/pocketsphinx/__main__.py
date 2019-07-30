@@ -26,6 +26,11 @@ def main():
         default=None,
     )
     parser.add_argument(
+        "--audio-file-lines",
+        action="store_true",
+        help="Audio file contains file names instead of audio data",
+    )
+    parser.add_argument(
         "--chunk-size",
         help="Number of bytes to read from audio file at a time (0 = synchronous read)",
         type=int,
@@ -69,15 +74,14 @@ def main():
 
     logger.debug(args)
 
-    # True if audio should be read entirely from a file each time
-    audio_sync = args.chunk_size <= 0
-    if audio_sync and not args.audio_file:
-        logger.fatal("Audio file required if audio sync is on (chunk_size = 0)")
-        sys.exit(1)
-
     audio_file = sys.stdin.buffer
-    if args.audio_file and not audio_sync:
-        audio_file = open(args.audio_file, "rb")
+    if args.audio_file and not (args.audio_file == "-"):
+        if not args.audio_file_lines:
+            # Contains raw audio data
+            audio_file = open(args.audio_file, "rb")
+        else:
+            # Contains file paths to raw audio files
+            audio_file = open(args.audio_file, "r")
 
     # Load pocketsphinx decoder
     decoder = get_decoder(
@@ -93,7 +97,7 @@ def main():
         audio_data = bytes()
 
         # Read thread (asynchronous)
-        if not audio_sync:
+        if not args.audio_file_lines:
 
             def read_audio():
                 nonlocal listening, audio_data
@@ -111,35 +115,51 @@ def main():
             threading.Thread(target=read_audio, daemon=True).start()
 
         # Wait for start/stop events
-        with open(args.events_file, "r") as events:
-            while True:
-                line = events.readline().strip()
-                if len(line) == 0:
-                    continue
+        if args.events_file == "-":
+            events = sys.stdin
+        else:
+            events = open(args.events_file, "r")
 
-                logger.debug(line)
-                topic, event = line.split(" ", maxsplit=1)
-                if topic == args.event_start:
-                    if audio_sync:
-                        with open(args.audio_file, "rb") as audio_file:
-                            # Read entire file
-                            audio_data = audio_file.read()
-                    else:
-                        # Clear buffer and start reading asynchronously
-                        audio_data = bytes()
-                        listening = True
-                        logger.debug("Started listening")
+        for line in events:
+            line = line.strip()
+            if len(line) == 0:
+                continue
 
-                elif topic == args.event_stop:
-                    # Stop reading and transcribe
-                    listening = False
-                    logger.debug(f"Stopped listening. Decoding {len(audio_data)} bytes")
-                    result = transcribe(decoder, audio_data)
-                    logger.debug(result)
-                    with jsonlines.Writer(sys.stdout) as out:
-                        out.write(result)
+            logger.debug(line)
+            topic, event = line.split(" ", maxsplit=1)
+            if topic == args.event_start:
+                if args.audio_file_lines:
+                    # Get next file path
+                    audio_path = audio_file.readline().strip()
+                    logging.debug(f"Reading {audio_path}")
+                    with open(audio_path, "rb") as actual_audio_file:
+                        # Read entire file
+                        audio_data = actual_audio_file.read()
+                else:
+                    # Clear buffer and start reading asynchronously
+                    audio_data = bytes()
+                    listening = True
+                    logger.debug("Started listening")
 
-                    sys.stdout.flush()
+            elif topic == args.event_stop:
+                # Stop reading and transcribe
+                listening = False
+                logger.debug(f"Stopped listening. Decoding {len(audio_data)} bytes")
+                result = transcribe(decoder, audio_data)
+                logger.debug(result.get("text", ""))
+
+                # Merge stop event data into result
+                try:
+                    event_dict = json.loads(event)
+                    for key, value in event_dict.items():
+                        result[key] = value
+                except:
+                    pass
+
+                with jsonlines.Writer(sys.stdout) as out:
+                    out.write(result)
+
+                sys.stdout.flush()
     else:
         # Read all data from audio file, decode, and stop
         audio_data = audio_file.read()

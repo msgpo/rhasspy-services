@@ -37,7 +37,7 @@ def main():
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    make_dict(
+    unknown_words = make_dict(
         args.vocab,
         args.dictionary,
         sys.stdout,
@@ -47,6 +47,9 @@ def main():
         no_number=args.no_number,
     )
 
+    if (len(unknown_words) > 0) and (args.unknown is None):
+        logging.fatal("Unknown words: %s" % ", ".join(unknown_words))
+        sys.exit(1)
 
 # -----------------------------------------------------------------------------
 
