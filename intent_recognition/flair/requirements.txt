@@ -1,0 +1,4 @@
+flair
+jsgf2fst==0.1.2
+paramiko
+apex
