@@ -5,6 +5,7 @@ import argparse
 import logging
 import subprocess
 import time
+import tempfile
 
 logger = logging.getLogger("espeak_pronounce")
 
@@ -12,10 +13,11 @@ logger = logging.getLogger("espeak_pronounce")
 def main():
     parser = argparse.ArgumentParser("espeak_pronounce")
     parser.add_argument(
-        "--dictionary", "-d", required=True, help="Path to pronunciation dictionary"
-    )
-    parser.add_argument(
         "--phoneme-map", "-m", required=True, help="Path to espeak phoneme map file"
+    )
+    parser.add_argument("--dictionary", "-d", help="Path to pronunciation dictionary")
+    parser.add_argument(
+        "--g2p-model", help="Use g2p model to guess word pronunciations"
     )
     parser.add_argument(
         "--pause",
@@ -23,6 +25,7 @@ def main():
         default=0.25,
         help="Number of seconds to pause between words",
     )
+    parser.add_argument("--skip", type=int, default=0, help="Skip n words")
     parser.add_argument(
         "--espeak-word", action="store_true", help="Prononuce word with espeak too"
     )
@@ -36,20 +39,29 @@ def main():
 
     logger.debug(args)
 
-    # Load dictionary
+    if (args.dictionary is None) and (args.g2p_model is None):
+        logger.fatal("Either --dictionary or --g2p-model is required")
+        sys.exit(1)
+
+    all_arpas = set()
     word_to_arpa = {}
-    with open(args.dictionary, "r") as dict_file:
-        for line in dict_file:
-            line = line.strip()
-            if len(line) == 0:
-                continue
+    has_dictionary = args.dictionary is not None
 
-            # Use explicit whitespace (avoid 0xA0)
-            word, arpas = re.split(r"[ \t]+", line, maxsplit=1)
-            if "(" in word:
-                continue
+    if has_dictionary:
+        # Load dictionary
+        with open(args.dictionary, "r") as dict_file:
+            for line in dict_file:
+                line = line.strip()
+                if len(line) == 0:
+                    continue
 
-            word_to_arpa[word] = re.split(r"\s+", arpas)
+                # Use explicit whitespace (avoid 0xA0)
+                word, arpas = re.split(r"[ \t]+", line, maxsplit=1)
+                if "(" in word:
+                    continue
+
+                word_to_arpa[word] = re.split(r"\s+", arpas)
+                all_arpas.update(word_to_arpa[word])
 
     # Load espeak map
     arpa_to_espeak = {}
@@ -62,30 +74,69 @@ def main():
             arpa, espeak = re.split(r"\s+", line)
             arpa_to_espeak[arpa] = espeak
 
+            if has_dictionary:
+                assert arpa in all_arpas, f"Missing {arpa} from espeak map"
+
     for word in sys.stdin:
         word = word.strip()
         if len(word) == 0:
             continue
 
+        if args.skip > 0:
+            args.skip -= 1
+            logger.debug(f"Skipping {word}")
+            continue
+
         if args.espeak_word:
             # Speak with espeak alone
-            espeak_cmd = ["espeak", "-s", "80"] + rest_args + [word]
+            espeak_cmd = (
+                ["espeak-ng", "-s", "80", "-x", "-q", "--sep= "] + rest_args + [word]
+            )
+            logger.debug(espeak_cmd)
+            espeaks = subprocess.check_output(espeak_cmd).decode().strip()
+            print(word, espeaks)
+
+            espeak_cmd = ["espeak-ng", "-s", "80"] + rest_args + [word]
             logger.debug(espeak_cmd)
 
-            print(word)
             subprocess.check_call(espeak_cmd)
             time.sleep(args.pause)
 
+        if has_dictionary:
+            # Look up
+            arpas = word_to_arpa.get(word, [])
+        else:
+            # Guess
+            with tempfile.NamedTemporaryFile(suffix=".txt", mode="w") as word_file:
+                print(word, file=word_file)
+                word_file.seek(0)
+
+                phonetisaurus_cmd = [
+                    "phonetisaurus-apply",
+                    "--model",
+                    args.g2p_model,
+                    "--word_list",
+                    word_file.name,
+                    "--nbest",
+                    "1",
+                ]
+
+                logging.debug(phonetisaurus_cmd)
+                phonetisaurus_output = (
+                    subprocess.check_output(phonetisaurus_cmd).decode().strip()
+                )
+
+                arpas = re.split(r"\s+", phonetisaurus_output)[1:]
+
         # Use phoneme map
-        arpas = word_to_arpa.get(word, [])
         espeaks = [arpa_to_espeak.get(a, "") for a in arpas]
         espeak_str = "".join(espeaks)
         logger.debug(espeak_str)
 
-        espeak_cmd = ["espeak", "-s", "80"] + rest_args + [f"[[{espeak_str}]]"]
+        espeak_cmd = ["espeak-ng", "-s", "80"] + rest_args + [f"[[{espeak_str}]]"]
         logger.debug(espeak_cmd)
 
-        print(word, " ".join(arpas), espeak_str)
+        print(word, " ".join(f"{a}/{e}" for a, e in zip(arpas, espeaks)))
         subprocess.check_call(espeak_cmd)
         time.sleep(args.pause)
 
