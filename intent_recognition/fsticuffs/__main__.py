@@ -34,6 +34,10 @@ def main():
         "--fuzzy", action="store_true", help="Use fuzzy search (slower)"
     )
     parser.add_argument(
+        "--stop-words",
+        help="File with words that can be ignored during fuzzy recognition",
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
 
@@ -62,9 +66,14 @@ def main():
         logger.debug(f"Skipping words outside of set: {known_tokens}")
 
     intent_graph = None
+    stop_words = set()
     if args.fuzzy:
         logger.debug("Fuzzy search enabled")
         intent_graph = fst_to_graph(intent_fst)
+
+        if args.stop_words:
+            with open(args.stop_words, "r") as stop_words_file:
+                stop_words = set([line.strip() for line in stop_words_file])
 
     # Recognize lines from stdin
     try:
@@ -87,7 +96,9 @@ def main():
 
             if args.fuzzy:
                 # Fuzzy search
-                intent = recognize_fuzzy(intent_graph, line, known_tokens)
+                intent = recognize_fuzzy(
+                    intent_graph, line, known_tokens=known_tokens, stop_words=stop_words
+                )
             else:
                 # Fast (strict) search
                 intent = recognize(intent_fst, line, known_tokens)

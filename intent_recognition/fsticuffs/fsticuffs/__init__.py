@@ -60,6 +60,7 @@ def recognize_fuzzy(
     intent_graph: nx.digraph.Graph,
     text: str,
     known_tokens: Optional[Set[str]] = None,
+    stop_words: Set[str] = set(),
     eps: str = "<eps>",
 ) -> Dict[str, Any]:
     tokens = re.split("\s+", text)
@@ -71,7 +72,9 @@ def recognize_fuzzy(
     # Only run search if there are any tokens
     intents = []
     if len(tokens) > 0:
-        intent_symbols_and_costs = _get_symbols_and_costs(intent_graph, tokens, eps=eps)
+        intent_symbols_and_costs = _get_symbols_and_costs(
+            intent_graph, tokens, stop_words=stop_words, eps=eps
+        )
         for intent_name, (symbols, cost) in intent_symbols_and_costs.items():
             intent = symbols2intent(symbols, eps=eps)
             intent["intent"]["confidence"] = (len(tokens) - cost) / len(tokens)
@@ -102,7 +105,10 @@ def recognize_fuzzy(
 
 
 def _get_symbols_and_costs(
-    intent_graph: nx.digraph.DiGraph, tokens: List[str], eps: str = "<eps>"
+    intent_graph: nx.MultiDiGraph,
+    tokens: List[str],
+    stop_words: Set[str] = set(),
+    eps: str = "<eps>",
 ) -> Dict[str, Tuple[List[str], int]]:
     # node -> attrs
     n_data = intent_graph.nodes(data=True)
@@ -122,14 +128,12 @@ def _get_symbols_and_costs(
     # BFS it up
     while len(q) > 0:
         q_node, q_in_tokens, q_out_tokens, q_cost, q_intent = q.pop()
-        logger.debug((q_node, q_in_tokens, q_out_tokens, q_cost, q_intent))
 
         # Update best intent cost on final state.
         # Don't bother reporting intents that failed to consume any tokens.
         if (n_data[q_node]["final"]) and (q_cost < len(tokens)):
             best_intent_cost = intent_symbols_and_costs.get(q_intent, (None, None))[1]
             final_cost = q_cost + len(q_in_tokens)  # remaning tokens count against
-            logger.debug((final_cost, q_intent, q_out_tokens))
 
             if (best_intent_cost is None) or (final_cost < best_intent_cost):
                 intent_symbols_and_costs[q_intent] = [q_out_tokens, final_cost]
@@ -141,40 +145,48 @@ def _get_symbols_and_costs(
             continue
 
         # Process child edges
-        for next_node, edge_data in intent_graph[q_node].items():
-            in_label = edge_data["in_label"]
-            out_label = edge_data["out_label"]
-            next_in_tokens = q_in_tokens[:]
-            next_out_tokens = q_out_tokens[:]
-            next_cost = q_cost
-            next_intent = q_intent
+        for next_node, edges in intent_graph[q_node].items():
+            for edge_idx, edge_data in edges.items():
+                in_label = edge_data["in_label"]
+                out_label = edge_data["out_label"]
+                next_in_tokens = q_in_tokens[:]
+                next_out_tokens = q_out_tokens[:]
+                next_cost = q_cost
+                next_intent = q_intent
 
-            if out_label.startswith("__label__"):
-                next_intent = out_label[9:]
+                if out_label.startswith("__label__"):
+                    next_intent = out_label[9:]
 
-            if in_label != eps:
-                # Consume non-matching tokens and increase cost
-                while (len(next_in_tokens) > 0) and (in_label != next_in_tokens[0]):
-                    next_in_tokens.pop(0)
-                    next_cost += 1
-
-                if len(next_in_tokens) > 0:
-                    # Consume matching token
-                    next_in_tokens.pop(0)
+                if in_label in stop_words:
+                    # Only consume token if it matches (no penalty if not)
+                    if (len(next_in_tokens) > 0) and (in_label == next_in_tokens[0]):
+                        next_in_tokens.pop(0)
 
                     if out_label != eps:
                         next_out_tokens.append(out_label)
-                else:
-                    # No matching token
-                    continue
-            else:
-                # Consume epsilon
-                if out_label != eps:
-                    next_out_tokens.append(out_label)
+                elif in_label != eps:
+                    # Consume non-matching tokens and increase cost
+                    while (len(next_in_tokens) > 0) and (in_label != next_in_tokens[0]):
+                        next_in_tokens.pop(0)
+                        next_cost += 1
 
-            q.append(
-                [next_node, next_in_tokens, next_out_tokens, next_cost, next_intent]
-            )
+                    if len(next_in_tokens) > 0:
+                        # Consume matching token
+                        next_in_tokens.pop(0)
+
+                        if out_label != eps:
+                            next_out_tokens.append(out_label)
+                    else:
+                        # No matching token
+                        continue
+                else:
+                    # Consume epsilon
+                    if out_label != eps:
+                        next_out_tokens.append(out_label)
+
+                q.append(
+                    [next_node, next_in_tokens, next_out_tokens, next_cost, next_intent]
+                )
 
     return intent_symbols_and_costs
 
@@ -182,13 +194,13 @@ def _get_symbols_and_costs(
 # -------------------------------------------------------------------------------------------------
 
 
-def fst_to_graph(the_fst: fst.Fst) -> nx.digraph.DiGraph:
+def fst_to_graph(the_fst: fst.Fst) -> nx.MultiDiGraph:
     """Converts a finite state transducer to a directed graph."""
     zero_weight = fst.Weight.Zero(the_fst.weight_type())
     in_symbols = the_fst.input_symbols()
     out_symbols = the_fst.output_symbols()
 
-    g = nx.digraph.DiGraph()
+    g = nx.MultiDiGraph()
 
     # Add nodes
     for state in the_fst.states():
