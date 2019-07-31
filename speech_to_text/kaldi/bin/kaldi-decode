@@ -95,10 +95,12 @@ trap finish EXIT
 # wav.scp
 i=1
 while [[ ! -z "$1" ]]; do
-    echo "utt_${i} sox -t wav  \"$(realpath "$1")\" -r 16000 -e signed-integer -b 16 -c 1 -t wav -|" >> "${temp_dir}/wav.scp"
+    wav_name="$(basename "$1")"
+    b64_name="$(echo "${wav_name}" | base64)"
+    echo "utt_${b64_name} sox -t wav  \"$(realpath "$1")\" -r 16000 -e signed-integer -b 16 -c 1 -t wav -|" >> "${temp_dir}/wav.scp"
 
     # Assume from a single speaker
-    echo "corpus utt_${i}" >> "${temp_dir}/spk2utt"
+    echo "corpus utt_${b64_name}" >> "${temp_dir}/spk2utt"
     shift
     ((i++))
 done
@@ -151,7 +153,7 @@ function gmm_decode {
                       -f 2- \
                       "${graph_dir}/words.txt" - | \
         grep '^utt_' | \
-        cut -d' ' -f 2-
+        sed -e 's/^utt_//'
 }
 
 function nnet3_decode {
@@ -173,13 +175,14 @@ function nnet3_decode {
         'ark:/dev/null' \
         2>&1 | \
         grep '^utt_' | \
-        cut -d' ' -f2-
+        sed -e 's/^utt_//'
 }
 
 function to_json {
-    while read -r text;
+    while read -r b64_name text;
     do
-        jq -n --arg t "${text}" '{ text: $t }' | jsonl
+        wav_name="$(echo "${b64_name}" | base64 -d)"
+        jq -n --arg t "${text}" --arg n "${wav_name}" '{ text: $t, wav_name: $n }' | jsonl
     done
 }
 
