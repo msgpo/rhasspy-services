@@ -21,11 +21,10 @@ def main():
     )
     parser.add_argument("--vocab", help="Path to write vocabulary")
     parser.add_argument(
-        "--fst-dir", help="Output directory for finite state transducers", default=None
+        "--fst-dir", help="Output directory for finite state transducers"
     )
-    parser.add_argument(
-        "--slots-dir", help="Directory with slot value files", default=None
-    )
+    parser.add_argument("--slots-dir", help="Directory with slot value files")
+    parser.add_argument("--whitelist", help="File with grammar names to process")
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to the console"
     )
@@ -34,6 +33,11 @@ def main():
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
+    whitelist = None
+    if args.whitelist:
+        with open(args.whitelist, "r") as whitelist_file:
+            whitelist = set([line.strip() for line in whitelist_file])
+
     make_fst(
         args.grammar_dir,
         args.fst,
@@ -41,6 +45,7 @@ def main():
         vocab_path=args.vocab,
         fst_dir=args.fst_dir,
         slots_dir=args.slots_dir,
+        grammar_whitelist=whitelist,
     )
 
 

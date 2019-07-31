@@ -8,7 +8,7 @@ import re
 import sys
 import tempfile
 import time
-from typing import Optional
+from typing import Optional, Set
 
 from jsgf import parser as jsgf_parser
 from jsgf2fst import jsgf2fst, read_slots, make_intent_fst, fst2arpa
@@ -21,6 +21,7 @@ def make_fst(
     vocab_path: Optional[str] = None,
     fst_dir: Optional[str] = None,
     slots_dir: Optional[str] = None,
+    grammar_whitelist: Optional[Set[str]] = None,
 ):
     if not fst_dir:
         fst_dir = tempfile.TemporaryDirectory().name
@@ -40,6 +41,12 @@ def make_fst(
     # Load all grammars
     grammars = []
     for f_name in os.listdir(grammar_dir):
+        if grammar_whitelist is not None:
+            grammar_name = os.path.splitext(f_name)[0]
+            if grammar_name not in grammar_whitelist:
+                logging.debug(f"Skipping {f_name} (not in whitelist)")
+                continue
+
         logging.debug(f"Parsing JSGF grammar {f_name}")
         grammar = jsgf_parser.parse_grammar_file(os.path.join(grammar_dir, f_name))
         grammars.append(grammar)
