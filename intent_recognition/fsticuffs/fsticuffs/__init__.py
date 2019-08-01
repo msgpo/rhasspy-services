@@ -53,7 +53,7 @@ def recognize(
         intent["text"] = text
 
     # Record recognition time
-    intent["recognize_time_sec"] = time.time() - start_time
+    intent["recognize_seconds"] = time.time() - start_time
 
     return intent
 
@@ -108,7 +108,7 @@ def recognize_fuzzy(
         intent["text"] = text
 
     # Record recognition time
-    intent["recognize_time_sec"] = time.time() - start_time
+    intent["recognize_seconds"] = time.time() - start_time
 
     return intent
 
@@ -240,4 +240,5 @@ def empty_intent() -> Dict[str, Any]:
         "entities": [],
         "intents": [],
         "slots": {},
+        "recognize_seconds": 0.0,
     }

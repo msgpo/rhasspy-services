@@ -54,6 +54,12 @@ def main():
         "--mllr-matrix", help="Path to tuned acoustic model MLLR matrix", default=None
     )
     parser.add_argument(
+        "--nbest",
+        type=int,
+        default=0,
+        help="Include up to N best alternative transcriptions",
+    )
+    parser.add_argument(
         "--event-start",
         help="Topic to start reading audio data (default=start)",
         default="start",
@@ -145,7 +151,7 @@ def main():
                 # Stop reading and transcribe
                 listening = False
                 logger.debug(f"Stopped listening. Decoding {len(audio_data)} bytes")
-                result = transcribe(decoder, audio_data)
+                result = transcribe(decoder, audio_data, nbest=args.nbest)
                 logger.debug(result.get("text", ""))
 
                 # Merge stop event data into result

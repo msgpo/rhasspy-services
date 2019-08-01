@@ -84,7 +84,7 @@ def recognize(
         intent["slots"][ev["entity"]] = ev["value"]
 
     # Record recognition time
-    intent["recognize_time_sec"] = time.time() - start_time
+    intent["recognize_seconds"] = time.time() - start_time
 
     return intent
 
@@ -220,4 +220,5 @@ def empty_intent() -> Dict[str, Any]:
         "entities": [],
         "intents": [],
         "slots": {},
+        "recognize_seconds": 0.0,
     }

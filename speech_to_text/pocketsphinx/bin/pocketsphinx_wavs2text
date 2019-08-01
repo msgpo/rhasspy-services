@@ -16,11 +16,15 @@ do
     echo 'start {}' >> "${events}"
 
     wav_name="$(basename "${wav_path}")"
+    wav_duration="$(soxi -D "${wav_path}")"
+
+    # Convert to 16-bit 16Khz mono (raw)
     audio_path="${temp_dir}/${wav_name}.raw"
     sox -t wav "${wav_path}" -t raw -r 16000 -e signed-integer -c 1 "${audio_path}"
     echo "${audio_path}" >> "${audio}"
 
-    stop_data="$(jq -n -c --arg p "${wav_path}" --arg n "${wav_name}" '{ wav_path:$p, wav_name:$n }')"
+    # Construct JSON object to pass through "stop" event
+    stop_data="$(jq -n -c --arg wn "${wav_name}" --argjson ws "${wav_duration}" '{ wav_name:$wn, wav_seconds:$ws }')"
     echo "stop ${stop_data}" >> "${events}"
 done
 

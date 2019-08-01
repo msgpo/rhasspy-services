@@ -48,8 +48,10 @@ def get_decoder(
 # -------------------------------------------------------------------------------------------------
 
 
-def transcribe(decoder: pocketsphinx.Decoder, audio_data: bytes) -> Dict[str, Any]:
-    """Transcribes audio data to speech."""
+def transcribe(
+    decoder: pocketsphinx.Decoder, audio_data: bytes, nbest: int = 0
+) -> Dict[str, Any]:
+    """Transcribes audio data to text."""
     # Process data as an entire utterance
     start_time = time.time()
     decoder.start_utt()
@@ -71,9 +73,12 @@ def transcribe(decoder: pocketsphinx.Decoder, audio_data: bytes) -> Dict[str, An
 
     result = {
         "text": transcription,
-        "seconds": decode_seconds,
+        "transcribe_seconds": decode_seconds,
         "likelihood": likelihood,
-        "nbest": {nb.hypstr: nb.score for nb in decoder.nbest()},
     }
+
+    if nbest > 0:
+        # Include alternative transcriptions
+        result["nbest"] = {nb.hypstr: nb.score for nb in decoder.nbest()[:nbest]}
 
     return result
