@@ -10,35 +10,6 @@ from flair.models import TextClassifier, SequenceTagger
 
 from jsgf2fst import fstaccept
 
-# Configure logging (flair screws with it)
-import logging.config
-
-logging.config.dictConfig(
-    {
-        "version": 1,
-        "disable_existing_loggers": True,
-        "formatters": {
-            "rhasspy.format": {"format": "%(levelname)s:%(name)s:%(message)s"}
-        },
-        "handlers": {
-            "rhasspy.handler": {
-                "class": "logging.StreamHandler",
-                "formatter": "rhasspy.format",
-                "stream": "ext://sys.stderr",
-            }
-        },
-        "loggers": {
-            "rhasspy": {"handlers": ["rhasspy.handler"], "propagate": False},
-            "flair": {
-                "handlers": ["rhasspy.handler"],
-                "level": "INFO",
-                "propagate": False,
-            },
-        },
-        "root": {"handlers": ["rhasspy.handler"]},
-    }
-)
-
 logger = logging.getLogger("flair_rhasspy")
 
 # -------------------------------------------------------------------------------------------------
@@ -87,6 +58,9 @@ def recognize(
             if slot_fst is not None:
                 try:
                     # Transform with FST
+                    logging.debug(
+                        f'Transforming "{slot_value}" for slot "{slot_name}" with FST'
+                    )
                     slot_value = fstaccept(slot_fst, slot_value)[0]["text"]
                 except:
                     logger.exception(slot_name)
@@ -101,7 +75,6 @@ def recognize(
                     "confidence": named_entity["confidence"],
                 }
             )
-
 
     # Add slots
     intent["slots"] = {}
@@ -170,6 +143,10 @@ def _make_slot_fst(state: int, intent_fst: fst.Fst, slot_to_fst: Dict[str, fst.F
         label = out_symbols.find(arc.olabel).decode()
         if label.startswith("__begin__"):
             slot_name = label[9:]
+
+            # Big assumption here that each instance of a slot (e.g., location)
+            # will produce the same FST, and therefore doesn't need to be
+            # processed again.
             if slot_name in slot_to_fst:
                 continue  # skip duplicate slots
 
@@ -212,9 +189,9 @@ def _make_slot_fst(state: int, intent_fst: fst.Fst, slot_to_fst: Dict[str, fst.F
                         slot_fst.set_final(state_map[q_state])
 
             slot_to_fst[slot_name] = minimize_fst(slot_fst)
-        else:
-            # Recurse
-            _make_slot_fst(arc.nextstate, intent_fst, slot_to_fst)
+
+        # Recurse
+        _make_slot_fst(arc.nextstate, intent_fst, slot_to_fst)
 
 
 # -------------------------------------------------------------------------------------------------

@@ -3,13 +3,10 @@ import os
 import sys
 import argparse
 import logging
+import logging.config
 
 import jsonlines
-import flair, torch
 import pywrapfst as fst
-
-from .flair_rhasspy import load_models, recognize, make_slot_fsts
-
 
 # -------------------------------------------------------------------------------------------------
 
@@ -50,6 +47,67 @@ def main():
 
     logging.debug(args)
 
+    if (
+        (args.class_model is None)
+        and (args.ner_model_dir is None)
+        and (len(args.ner_model) == 0)
+    ):
+        logging.fatal(
+            "One of --class-model, --ner-model-dir, or --ner-model is required"
+        )
+        sys.exit(1)
+
+    # -------------------------------------------------------------------------
+
+    # Doing imports later because they're so slow (ensure --help is fast)
+    import flair, torch
+    from .flair_rhasspy import load_models, recognize, make_slot_fsts
+
+    # Configure logging (flair screws with it)
+    logging.config.dictConfig(
+        {
+            "version": 1,
+            "disable_existing_loggers": True,
+            "formatters": {
+                "rhasspy.format": {"format": "%(levelname)s:%(name)s:%(message)s"}
+            },
+            "handlers": {
+                "rhasspy.handler": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "rhasspy.format",
+                    "stream": "ext://sys.stderr",
+                }
+            },
+            "loggers": {
+                "rhasspy": {"handlers": ["rhasspy.handler"], "propagate": False},
+                "flair": {
+                    "handlers": ["rhasspy.handler"],
+                    "level": "INFO",
+                    "propagate": False,
+                },
+            },
+            "root": {"handlers": ["rhasspy.handler"]},
+        }
+    )
+
+    if args.debug:
+        logging.root.setLevel(logging.DEBUG)
+
+    # Load intent FST
+    if args.intent_fst is not None:
+        logging.debug(f"Loading intent FST from {args.intent_fst}")
+        intent_fst = fst.Fst.read(args.intent_fst)
+        intent_to_slots = make_slot_fsts(intent_fst)
+        logging.debug(
+            "Intent slots: {}".format(
+                {
+                    name: list(slot_fsts.keys())
+                    for name, slot_fsts in intent_to_slots.items()
+                }
+            )
+        )
+
+    # Load NER models
     ner_model_paths = [p for p in args.ner_model]
     if args.ner_model_dir:
         for f_name in os.listdir(args.ner_model_dir):
@@ -65,12 +123,6 @@ def main():
 
     # Load flair models
     class_model, ner_models = load_models(args.class_model, ner_model_paths)
-
-    intent_to_slots = {}
-    if args.intent_fst is not None:
-        logging.debug(f"Loading intent FST from {args.intent_fst}")
-        intent_fst = fst.Fst.read(args.intent_fst)
-        intent_to_slots = make_slot_fsts(intent_fst)
 
     # Recognize lines from stdin
     try:
