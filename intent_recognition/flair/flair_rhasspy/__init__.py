@@ -2,6 +2,7 @@
 import os
 import logging
 import subprocess
+import time
 from typing import Dict, Tuple, Any, Optional, List
 
 import pywrapfst as fst
@@ -25,6 +26,7 @@ def recognize(
     intent = empty_intent()
     intent["text"] = text
 
+    start_time = time.time()
     sentence = Sentence(text)
 
     if class_model is not None:
@@ -80,6 +82,9 @@ def recognize(
     intent["slots"] = {}
     for ev in intent["entities"]:
         intent["slots"][ev["entity"]] = ev["value"]
+
+    # Record recognition time
+    intent["recognize_time_sec"] = time.time() - start_time
 
     return intent
 

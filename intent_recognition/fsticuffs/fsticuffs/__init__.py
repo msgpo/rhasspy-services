@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger("fsticuffs")
 
 import re
+import time
 from typing import Optional, Dict, Any, Set, List, Tuple
 
 import pywrapfst as fst
@@ -19,6 +20,7 @@ from jsgf2fst import fstaccept, symbols2intent
 def recognize(
     intent_fst: fst.Fst, text: str, known_tokens: Optional[Set[str]] = None
 ) -> Dict[str, Any]:
+    start_time = time.time()
     tokens = re.split("\s+", text)
 
     if known_tokens:
@@ -50,6 +52,9 @@ def recognize(
         intent = empty_intent()
         intent["text"] = text
 
+    # Record recognition time
+    intent["recognize_time_sec"] = time.time() - start_time
+
     return intent
 
 
@@ -63,6 +68,7 @@ def recognize_fuzzy(
     stop_words: Set[str] = set(),
     eps: str = "<eps>",
 ) -> Dict[str, Any]:
+    start_time = time.time()
     tokens = re.split("\s+", text)
 
     if known_tokens:
@@ -100,6 +106,9 @@ def recognize_fuzzy(
     else:
         intent = empty_intent()
         intent["text"] = text
+
+    # Record recognition time
+    intent["recognize_time_sec"] = time.time() - start_time
 
     return intent
 
