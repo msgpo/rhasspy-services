@@ -1,0 +1,7 @@
+jsonlines
+pyyaml
+pydash
+paho-mqtt
+quart
+quart-cors
+quart-openapi
