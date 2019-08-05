@@ -42,8 +42,6 @@ fi
 # -----------------------------------------------------------------------------
 
 clients+=("$@")
-
-export clients
 client_str="$(echo "${clients[@]}" | sed -e 's/ /,/g')"
 
 if [[ ! -z "${cli_clients}" ]]; then

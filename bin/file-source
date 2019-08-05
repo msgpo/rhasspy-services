@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+program_name="$(basename "$0")"
+
+if [[ -z "$1" ]]; then
+    echo "Usage: ${program_name} FILE"
+    exit 1
+fi
+
+file_path="$(realpath "$1")"
+
+gst-launch-1.0 \
+    filesrc "location=${file_path}" ! \
+    decodebin ! \
+    audioconvert ! \
+    audioresample ! \
+    audio/x-raw, rate=16000, channels=1, format=S16LE ! \
+    filesink location=/dev/stdout

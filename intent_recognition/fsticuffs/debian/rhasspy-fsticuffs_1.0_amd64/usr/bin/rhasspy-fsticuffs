@@ -1,2 +1,0 @@
-#!/usr/bin/env sh
-/usr/lib/rhasspy/fsticuffs/fsticuffs "$@"

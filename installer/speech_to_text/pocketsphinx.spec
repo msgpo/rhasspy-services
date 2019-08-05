@@ -5,7 +5,7 @@ block_cipher = None
 
 
 a = Analysis(
-    [os.path.join(os.getcwd(), "speech_to_text/pocketsphinx/pocketsphinx-cli.py")],
+    [os.path.join(os.getcwd(), "speech_to_text/pocketsphinx/__main__.py")],
     pathex=["."],
     binaries=[],
     datas=[],

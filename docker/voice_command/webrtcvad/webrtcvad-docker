@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+docker run -it \
+      -v '/etc/localtime:/etc/localtime:ro' \
+      --network host \
+      rhasspy/voice-command/webrtcvad \
+      "$@"

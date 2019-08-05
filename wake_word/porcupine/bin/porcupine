@@ -1,2 +1,17 @@
 #!/usr/bin/env bash
-python3 -m wake_word.porcupine "$@"
+args=()
+if [[ ! -z "${porcupine_library}" ]]; then
+    args+=('--library' "${porcupine_library}")
+fi
+
+if [[ ! -z "${porcupine_model}" ]]; then
+    args+=('--model' "${porcupine_model}")
+fi
+
+if [[ ! -z "${porcupine_keyword}" ]]; then
+    args+=('--keyword' "${porcupine_keyword}")
+fi
+
+args+=("$@")
+
+python3 -m wake_word.porcupine "${args[@]}"

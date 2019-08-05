@@ -1,0 +1,8 @@
+Package: rhasspy-fsticuffs
+Version: 1.0
+Section: utils
+Priority: optional
+Depends: libc6,libstdc++6
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: OpenFST-based intent recognition tool for Rhasspy voice assistant

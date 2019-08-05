@@ -1,5 +1,5 @@
 jsonlines
 pyyaml
 pydash
-jsgf2fst==0.1.1
+jsgf2fst==0.1.2
 networkx

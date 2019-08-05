@@ -1,12 +1,33 @@
 #!/usr/bin/env bash
-set -e
 this_dir="$( cd "$( dirname "$0" )" && pwd )"
+rhasspy_dir="$(realpath "${this_dir}/../..")"
 
-if [[ ! -z "$1" ]]; then
-    this_dir="$1"
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'venv' "${this_dir}/.venv" 'Path to create virtual environment'
+DEFINE_string 'download-dir' "${rhasspy_dir}/download" 'Directory to cache downloaded files'
+
+DEFINE_boolean 'no-create' false 'Do not re-create the virtual environment'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+venv="${FLAGS_venv}"
+download_dir="${FLAGS_download_dir}"
+
+if [[ "${FLAGS_no_create}" -eq "${FLAGS_TRUE}" ]]; then
+    no_create='true'
 fi
-
-install_dir="$(realpath "${this_dir}")"
 
 # -----------------------------------------------------------------------------
 # Debian dependencies
@@ -43,20 +64,34 @@ if [[ -z "$(python_module venv)" ]]; then
     install python3-venv
 fi
 
-# Set up fresh virtual environment
-venv="${install_dir}/.venv"
-rm -rf "${venv}"
+# netcat
+if [[ -z "$(which nc)" ]]; then
+    echo "Installing netcat"
+    install netcat
+fi
 
-python3 -m venv "${venv}"
-source "${venv}/bin/activate"
-python3 -m pip install wheel
+# -----------------------------------------------------------------------------
+# Virtual environment
+# -----------------------------------------------------------------------------
+
+if [[ -z "${no_create}" ]]; then
+    # Set up fresh virtual environment
+    echo "Re-creating virtual environment at ${venv}"
+    rm -rf "${venv}"
+
+    python3 -m venv "${venv}"
+    source "${venv}/bin/activate"
+    python3 -m pip install wheel
+elif [[ -d "${venv}" ]]; then
+    echo "Using virtual environment at ${venv}"
+    source "${venv}/bin/activate"
+fi
 
 # -----------------------------------------------------------------------------
 # Python Requirements
 # -----------------------------------------------------------------------------
 
-cd "${install_dir}" && \
-    python3 -m pip install -r "${install_dir}/requirements.txt"
+python3 -m pip install -r "${this_dir}/requirements.txt"
 
 # -----------------------------------------------------------------------------
 

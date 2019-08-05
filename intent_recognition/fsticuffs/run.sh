@@ -22,6 +22,7 @@ export shflags="${rhasspy_dir}/etc/shflags"
 
 # Local path
 export PATH="${this_dir}/bin:${rhasspy_dir}/bin:${PATH}"
+export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
 
 # Run command in local venv
 "$@"

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 this_dir="$( cd "$( dirname "$0" )" && pwd )"
+rhasspy_dir="$(realpath "${this_dir}/../..")"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-. "${this_dir}/etc/shflags"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'venv' "${this_dir}/.venv" 'Path to create virtual environment'
-DEFINE_string 'download-dir' "${this_dir}/download" 'Directory to cache downloaded files'
+DEFINE_string 'download-dir' "${rhasspy_dir}/download" 'Directory to cache downloaded files'
 DEFINE_boolean 'no-create' false 'Do not re-create the virtual environment'
 DEFINE_integer 'make-threads' 4 'Number of threads to use with make' 'j'
 
@@ -83,6 +84,16 @@ if [[ -z "$(which mosquitto_sub)" ]]; then
     install mosquitto-clients
 fi
 
+# build tools
+if [[ -z "$(which g++)" ]]; then
+    echo "Installing build-essential"
+    install build-essential
+fi
+
+# -----------------------------------------------------------------------------
+# Virtual environment
+# -----------------------------------------------------------------------------
+
 if [[ -z "${no_create}" ]]; then
     # Set up fresh virtual environment
     echo "Re-creating virtual environment at ${venv}"
@@ -125,9 +136,9 @@ cp -R "${openfst_dir}"/build/lib/*.so* "${venv}/lib/"
 # jsgf2fst
 # -----------------------------------------------------------------------------
 
-jsgf2fst_file="${download_dir}/jsgf2fst-0.1.1.tar.gz"
+jsgf2fst_file="${download_dir}/jsgf2fst-0.1.2.tar.gz"
 if [[ ! -f "${jsgf2fst_file}" ]]; then
-    jsgf2fst_url='https://github.com/synesthesiam/jsgf2fst/releases/download/v0.1.0/jsgf2fst-0.1.1.tar.gz'
+    jsgf2fst_url='https://github.com/synesthesiam/jsgf2fst/releases/download/v0.1.0/jsgf2fst-0.1.2.tar.gz'
     echo "Downloading jsgf2fst (${jsgf2fst_url})"
     download "${jsgf2fst_url}" "${jsgf2fst_file}"
 fi
