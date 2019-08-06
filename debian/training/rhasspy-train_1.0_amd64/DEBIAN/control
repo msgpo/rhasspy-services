@@ -1,0 +1,8 @@
+Package: rhasspy-train
+Version: 1.0
+Section: utils
+Priority: optional
+Depends: libstdc++6
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: Training utilities for Rhasspy voice assistant

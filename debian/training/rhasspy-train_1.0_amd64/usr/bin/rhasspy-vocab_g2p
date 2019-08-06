@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -e
+
+temp_list="$(mktemp)"
+function finish {
+    rm -f "${temp_list}"
+}
+
+trap finish EXIT
+
+# -----------------------------------------------------------------------------
+
+install_dir='/usr/lib/rhasspy/train/'
+export PATH="${install_dir}:${PATH}"
+export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
+
+cat > "${temp_list}"
+"${install_dir}/phonetisaurus-apply" \
+    --word_list "${temp_list}" "$@" | \
+    "${install_dir}/vocab_g2p"

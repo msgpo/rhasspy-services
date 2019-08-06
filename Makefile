@@ -1,4 +1,5 @@
 .PHONY: debian-fsticuffs \
+        debian-train \
         docker-espeak \
         docker-fsticuffs \
         docker-pocketsphinx \
@@ -6,7 +7,8 @@
         docker-pulseaudio-input \
         docker-pulseaudio-output \
         docker-webrtcvad \
-        installer-fsticuffs
+        installer-fsticuffs \
+        installer-train
 
 # -----------------------------------------------------------------------------
 
@@ -44,9 +46,20 @@ docker-webrtcvad:
 installer-fsticuffs:
 	bash build.sh installer/intent_recognition/fsticuffs.spec
 
+installer-train:
+	bash build.sh installer/training/ini_jsgf.spec
+	bash build.sh installer/training/vocab_g2p.spec
+	bash build.sh installer/training/vocab_dict.spec
+	bash build.sh installer/training/jsgf_fst_arpa.spec
+	bash build.sh installer/training/train.spec
+
 # -----------------------------------------------------------------------------
 # Debian
 # -----------------------------------------------------------------------------
 
 debian-fsticuffs: installer-fsticuffs
 	bash debianize.sh intent_recognition fsticuffs $(FRIENDLY_ARCH)
+
+debian-train: installer-train
+	rsync -av dist/ini_jsgf/ dist/vocab_g2p/ dist/vocab_dict/ dist/jsgf_fst_arpa/ dist/train/
+	bash debianize.sh training train $(FRIENDLY_ARCH)

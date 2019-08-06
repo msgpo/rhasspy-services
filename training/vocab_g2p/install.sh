@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 this_dir="$( cd "$( dirname "$0" )" && pwd )"
+rhasspy_dir="$(realpath "${this_dir}/../..")"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-. "${this_dir}/etc/shflags"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'venv' "${this_dir}/.venv" 'Path to create virtual environment'
-DEFINE_string 'download-dir' "${this_dir}/download" 'Directory to cache downloaded files'
+DEFINE_string 'download-dir' "${rhasspy_dir}/download" 'Directory to cache downloaded files'
 DEFINE_boolean 'no-create' false 'Do not re-create the virtual environment'
 DEFINE_integer 'make-threads' 4 'Number of threads to use with make' 'j'
 
@@ -47,12 +48,6 @@ function python_module {
 
 export -f python_module
 
-# python 3
-if [[ -z "$(which python3)" ]]; then
-    echo "Installing python 3"
-    install python3
-fi
-
 function download {
     mkdir -p "$(dirname "$2")"
     curl -sSfL -o "$2" "$1"
@@ -76,6 +71,16 @@ if [[ -z "$(python_module venv)" ]]; then
     echo "Installing python venv"
     install python3-venv
 fi
+
+# build tools
+if [[ -z "$(which g++)" ]]; then
+    echo "Installing build-essential"
+    install build-essential
+fi
+
+# -----------------------------------------------------------------------------
+# Virtual environment
+# -----------------------------------------------------------------------------
 
 if [[ -z "${no_create}" ]]; then
     # Set up fresh virtual environment
@@ -142,6 +147,8 @@ fi
 
 cp -R "${phonetisaurus_dir}"/build/bin/* "${venv}/bin/"
 
+# -----------------------------------------------------------------------------
+# Python dependencies
 # -----------------------------------------------------------------------------
 
 python3 -m pip install -r "${this_dir}/requirements.txt"

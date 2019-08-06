@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -e
+
 temp_list="$(mktemp)"
 function finish {
     rm -f "${temp_list}"
