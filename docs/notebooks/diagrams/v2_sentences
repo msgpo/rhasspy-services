@@ -1,0 +1,16 @@
+blockdiag {
+    "sentences.ini" [color="yellow"]
+    "JSGF Grammars" [stacked]
+    "Speech Recognizer" [color="#CCCCFF"]
+    "Intent Recognizer" [color="#CCCCFF"]
+    
+    "sentences.ini" -> "JSGF Grammars";
+    "JSGF Grammars" -> "Language Model";
+    "JSGF Grammars" -> "Dictionary";
+    "JSGF Grammars" -> "Intent Recognizer";
+    
+    "Language Model" -> "Speech Recognizer";
+    "Dictionary" -> "Speech Recognizer";
+    
+    "Speech Recognizer" -> "Intent Recognizer";
+}

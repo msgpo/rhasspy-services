@@ -11,6 +11,7 @@
         docker-pulseaudio-output \
         docker-webrtcvad \
         installer-fsticuffs \
+        installer-kaldi \
         installer-pocketsphinx \
         installer-porcupine \
         installer-train \

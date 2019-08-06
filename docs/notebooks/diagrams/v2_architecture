@@ -1,0 +1,7 @@
+blockdiag {
+    "Web Interface" [shape="cloud"]
+    "Dialogue Manager" [shape="roundedbox", color="yellow"]
+    "Sub-System Actors" [shape="roundedbox", stacked]
+    
+    "Web Interface" <-> "Dialogue Manager" <-> "Sub-System Actors";
+}
