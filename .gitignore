@@ -13,8 +13,5 @@ run/wav/cache/
 *.deb
 /intent_recognition/fsticuffs/openfst-1.6.9/
 
-debian/intent_recognition/rhasspy-fsticuffs_1.0_amd64/usr/lib/rhasspy/fsticuffs/
-debian/speech_to_text/rhasspy-pocketsphinx_1.0_amd64/usr/lib/rhasspy/pocketsphinx/
-debian/voice_command/rhasspy-webrtcvad_1.0_amd64/usr/lib/rhasspy/webrtcvad/
-debian/wake_word/rhasspy-porcupine_1.0_amd64/usr/lib/rhasspy/porcupine/
-debian/training/rhasspy-train_1.0_amd64/usr/lib/rhasspy/train/
+debian/**/usr/lib/
+debian/**/opt/

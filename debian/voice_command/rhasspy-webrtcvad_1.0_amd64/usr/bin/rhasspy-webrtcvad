@@ -1,2 +1,4 @@
 #!/usr/bin/env sh
-/usr/lib/rhasspy/webrtcvad/webrtcvad_rhasspy "$@"
+install_dir='/usr/lib/rhasspy/webrtcvad'
+export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
+"${install_dir}/webrtcvad" "$@"

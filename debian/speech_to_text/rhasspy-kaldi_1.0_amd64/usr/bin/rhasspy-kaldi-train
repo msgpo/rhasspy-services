@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+args=()
+
+if [[ -z "${kaldi_dir}" ]]; then
+    kaldi_dir='/opt/rhasspy-kaldi'
+fi
+
+args+=('--kaldi-dir' "${kaldi_dir}")
+args+=("$@")
+
+# -----------------------------------------------------------------------------
+
+install_dir='/usr/lib/rhasspy'
+export shflags="${install_dir}/etc/kaldi/shflags"
+
+"${install_dir}/bin/kaldi/kaldi-train" "${args[@]}"

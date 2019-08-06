@@ -226,12 +226,12 @@ function to_json {
         transcribe_seconds="$(bc -l <<<"${duration_proportion}*${total_seconds}" | awk '{printf "%f", $0}')"
 
         # Augment transcription with wav name and decode time
-        jq -n \
+        jq -n -c \
            --arg t "${text}" \
            --argjson ws "${wav_duration}" \
            --arg wn "${wav_name}" \
            --argjson ts "${transcribe_seconds}" \
-           '{ text: $t, wav_name: $wn, wav_seconds: $ws, transcribe_seconds: $ts }' | jsonl
+           '{ text: $t, wav_name: $wn, wav_seconds: $ws, transcribe_seconds: $ts }'
     done
 }
 

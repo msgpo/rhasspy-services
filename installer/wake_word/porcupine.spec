@@ -1,13 +1,25 @@
 # -*- mode: python -*-
+import os
 
 block_cipher = None
 
+venv = os.path.join(os.getcwd(), ".venv")
+porcupine = os.path.join(os.getcwd(), "wake_word/porcupine")
 
 a = Analysis(
-    ["porcupine_rhasspy/__main__.py"],
+    [os.path.join(os.getcwd(), "wake_word/porcupine/__main__.py")],
     pathex=["."],
     binaries=[],
-    datas=[("porcupine.py", ".")],
+    datas=[
+        (
+            os.path.join(
+                porcupine, "porcupine_rhasspy/porcupine.py"
+            ),
+            ".",
+        ),
+        (os.path.join(porcupine, "lib"), "lib"),
+        (os.path.join(porcupine, "resources"), "resources"),
+    ],
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
@@ -23,7 +35,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="porcupine_rhasspy",
+    name="porcupine",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -31,5 +43,5 @@ exe = EXE(
     console=True,
 )
 coll = COLLECT(
-    exe, a.binaries, a.zipfiles, a.datas, strip=False, upx=True, name="porcupine_rhasspy"
+    exe, a.binaries, a.zipfiles, a.datas, strip=False, upx=True, name="porcupine"
 )

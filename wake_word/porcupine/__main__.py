@@ -7,7 +7,7 @@ import os
 import sys
 import argparse
 
-from .porcupine_rhasspy import wait_for_wake_word
+from wake_word.porcupine.porcupine_rhasspy import wait_for_wake_word
 
 # -------------------------------------------------------------------------------------------------
 

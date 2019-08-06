@@ -1,2 +1,25 @@
-#!/usr/bin/env sh
-/usr/lib/rhasspy/porcupine/porcupine_rhasspy "$@"
+#!/usr/bin/env bash
+install_dir='/usr/lib/rhasspy/porcupine'
+export PATH="${install_dir}:${PATH}"
+export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
+
+args=()
+args+=('--library' "${install_dir}/lib/x86_64/libpv_porcupine.so")
+args+=('--model' "${install_dir}/lib/common/porcupine_params.pv")
+
+keyword="${install_dir}/resources/keyword_files/linux/porcupine_linux.ppn"
+for arg in "$@";
+do
+    if [[ "${arg}" == '--keyword' ]]; then
+        keyword=''
+        break
+    fi
+done
+
+if [[ ! -z "${keyword}" ]]; then
+    args+=('--keyword' "${keyword}")
+fi
+
+args+=("$@")
+
+"${install_dir}/porcupine" "${args[@]}"

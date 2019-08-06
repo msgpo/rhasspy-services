@@ -3,10 +3,8 @@ import os
 
 block_cipher = None
 
-venv = os.path.join(os.getcwd(), ".venv")
-
 a = Analysis(
-    [os.path.join(os.getcwd(), "speech_to_text/pocketsphinx/__main__.py")],
+    [os.path.join(os.getcwd(), "speech_to_text/kaldi/__main__.py")],
     pathex=["."],
     binaries=[],
     datas=[],
@@ -25,7 +23,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="pocketsphinx",
+    name="kaldi",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -33,5 +31,5 @@ exe = EXE(
     console=True,
 )
 coll = COLLECT(
-    exe, a.binaries, a.zipfiles, a.datas, strip=False, upx=True, name="pocketsphinx"
+    exe, a.binaries, a.zipfiles, a.datas, strip=False, upx=True, name="kaldi"
 )

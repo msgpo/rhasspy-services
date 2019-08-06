@@ -1,0 +1,8 @@
+Package: rhasspy-kaldi
+Version: 1.0
+Section: utils
+Priority: optional
+Depends: libstdc++6,jq,sox
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: Kaldi-based speech recognition tool for Rhasspy voice assistant

@@ -1,15 +1,20 @@
 # -*- mode: python -*-
+import os
 from PyInstaller.utils.hooks import copy_metadata
 
 block_cipher = None
 
+venv = os.path.join(os.getcwd(), ".venv")
 
 a = Analysis(
-    ["webrtcvad_rhasspy/__main__.py"],
+    [os.path.join(os.getcwd(), "voice_command/webrtcvad/__main__.py")],
     pathex=["."],
     binaries=[
         (
-            ".venv/lib/python3.6/site-packages/_webrtcvad.cpython-36m-x86_64-linux-gnu.so",
+            os.path.join(
+                venv,
+                "lib/python3.6/site-packages/_webrtcvad.cpython-36m-x86_64-linux-gnu.so",
+            ),
             ".",
         )
     ],
@@ -29,7 +34,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="webrtcvad_rhasspy",
+    name="webrtcvad",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -37,11 +42,5 @@ exe = EXE(
     console=True,
 )
 coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    name="webrtcvad_rhasspy",
+    exe, a.binaries, a.zipfiles, a.datas, strip=False, upx=True, name="webrtcvad"
 )

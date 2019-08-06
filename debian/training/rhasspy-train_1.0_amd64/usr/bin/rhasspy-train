@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-install_dir='/usr/lib/rhasspy/train/'
+install_dir='/usr/lib/rhasspy/train'
 export PATH="${install_dir}:${PATH}"
 export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
 

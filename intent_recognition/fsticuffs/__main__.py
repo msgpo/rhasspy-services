@@ -12,7 +12,12 @@ from typing import Optional, Dict, Any, Set
 import jsonlines
 import pywrapfst as fst
 
-from .fsticuffs import recognize, empty_intent, fst_to_graph, recognize_fuzzy
+from intent_recognition.fsticuffs.fsticuffs import (
+    recognize,
+    empty_intent,
+    fst_to_graph,
+    recognize_fuzzy,
+)
 
 # -------------------------------------------------------------------------------------------------
 

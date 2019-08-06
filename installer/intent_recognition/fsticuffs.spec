@@ -6,11 +6,14 @@ block_cipher = None
 venv = os.path.join(os.getcwd(), ".venv")
 
 a = Analysis(
-    [os.path.join(os.getcwd(), "installer/intent_recognition/fsticuffs.py")],
+    [os.path.join(os.getcwd(), "intent_recognition/fsticuffs/__main__.py")],
     pathex=["."],
     binaries=[
         (
-            os.path.join(venv, "lib/python3.6/site-packages/pywrapfst.cpython-36m-x86_64-linux-gnu.so"),
+            os.path.join(
+                venv,
+                "lib/python3.6/site-packages/pywrapfst.cpython-36m-x86_64-linux-gnu.so",
+            ),
             ".",
         ),
         (os.path.join(venv, "lib/libfstfarscript.so.13"), "."),

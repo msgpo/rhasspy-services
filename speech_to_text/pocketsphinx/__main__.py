@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any, Set
 import jsonlines
 import pocketsphinx
 
-from .pocketsphinx_rhasspy import get_decoder, transcribe
+from speech_to_text.pocketsphinx.pocketsphinx_rhasspy import get_decoder, transcribe
 
 # -------------------------------------------------------------------------------------------------
 

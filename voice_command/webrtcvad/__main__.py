@@ -7,7 +7,7 @@ import os
 import sys
 import argparse
 
-from .webrtcvad_rhasspy import wait_for_command
+from voice_command.webrtcvad.webrtcvad_rhasspy import wait_for_command
 
 # -------------------------------------------------------------------------------------------------
 

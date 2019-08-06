@@ -2,6 +2,7 @@ Package: rhasspy-porcupine
 Version: 1.0
 Section: utils
 Priority: optional
+Depends: libc6
 Architecture: amd64
 Maintainer: Michael Hansen
 Description: Porcupine-based wake word detection tool for Rhasspy voice assistant
