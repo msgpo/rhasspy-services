@@ -5,7 +5,9 @@
         debian-train \
         docker-espeak \
         docker-fsticuffs \
+        docker-kaldi \
         docker-pocketsphinx \
+        docker-training \
         docker-porcupine \
         docker-pulseaudio-input \
         docker-pulseaudio-output \
@@ -31,8 +33,14 @@ docker-espeak:
 docker-fsticuffs:
 	docker build . -f docker/intent_recognition/fsticuffs/Dockerfile -t rhasspy/intent-recognition/fsticuffs
 
+docker-kaldi:
+	docker build . -f docker/speech_to_text/kaldi/Dockerfile -t rhasspy/speech-to-text/kaldi
+
 docker-pocketsphinx:
 	docker build . -f docker/speech_to_text/pocketsphinx/Dockerfile -t rhasspy/speech-to-text/pocketsphinx
+
+docker-training:
+	docker build . -f docker/training/Dockerfile -t rhasspy/training
 
 docker-porcupine:
 	docker build . -f docker/wake_word/porcupine/Dockerfile -t rhasspy/wake-word/porcupine

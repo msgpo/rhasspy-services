@@ -11,4 +11,5 @@ fi
 
 source "${venv}/bin/activate"
 export LD_LIBRARY_PATH="${venv}/lib:${LD_LIBRARY_PATH}"
+export PATH="${rhasspy_dir}/docker/bin:${PATH}"
 jupyter notebook

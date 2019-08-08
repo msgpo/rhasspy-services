@@ -1,7 +1,60 @@
-.venv/
-build/
-dist/
-run/
-debian/
-__pycache__/
-.git/
+# Exclude everything
+*
+
+# Include only specific items
+!download/
+!bin/
+!etc/shflags
+!etc/kaldi/
+
+# fsticuffs
+!intent_recognition/fsticuffs/requirements.txt
+!intent_recognition/fsticuffs/*.py
+!intent_recognition/fsticuffs/bin/
+!intent_recognition/fsticuffs/fsticuffs/*.py
+
+# kaldi
+!speech_to_text/kaldi/*.py
+!speech_to_text/kaldi/bin/
+
+# pocketsphinx
+!speech_to_text/pocketsphinx/requirements.txt
+!speech_to_text/pocketsphinx/*.py
+!speech_to_text/pocketsphinx/bin/
+!speech_to_text/pocketsphinx/pocketsphinx_rhasspy/*.py
+!speech_to_text/pocketsphinx/http_server/*.py
+
+# porcupine
+!wake_word/porcupine/requirements.txt
+!wake_word/porcupine/*.py
+!wake_word/porcupine/bin/
+!wake_word/porcupine/lib/
+!wake_word/porcupine/resources/
+!wake_word/porcupine/porcupine_rhasspy/*.py
+
+# Training
+!training/requirements.txt
+!training/*.py
+!training/bin/
+
+!training/ini_jsgf/*.py
+!training/ini_jsgf/bin/
+!training/ini_jsgf/ini_jsgf/*.py
+
+!training/jsgf_fst_arpa/*.py
+!training/jsgf_fst_arpa/bin/
+!training/jsgf_fst_arpa/jsgf_fst_arpa/*.py
+
+!training/vocab_dict/*.py
+!training/vocab_dict/bin/
+!training/vocab_dict/vocab_dict/*.py
+
+!training/vocab_g2p/*.py
+!training/vocab_g2p/bin/
+!training/vocab_g2p/vocab_g2p/*.py
+
+# webrtcvad
+!voice_command/webrtcvad/requirements.txt
+!voice_command/webrtcvad/*.py
+!voice_command/webrtcvad/bin/
+!voice_command/webrtcvad/webrtcvad_rhasspy/*.py

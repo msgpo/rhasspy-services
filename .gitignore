@@ -16,3 +16,5 @@ run/wav/cache/
 
 debian/**/usr/lib/
 debian/**/opt/
+
+docs/notebooks/profile/

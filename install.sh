@@ -235,7 +235,9 @@ if [[ ! -d "${phonetisaurus_dir}/build" ]]; then
 
     tar -C "${build_dir}" -xf "${phonetisaurus_file}" && \
         cd "${phonetisaurus_dir}" && \
-        CXXFLAGS="-I${venv}/include" LDFLAGS="-L${venv}/lib" ./configure "--prefix=${phonetisaurus_dir}/build" && \
+        ./configure "--prefix=${phonetisaurus_dir}/build" \
+                    --with-openfst-includes="${venv}/include" \
+                    --with-openfst-libs="${venv}/lib" && \
         make -j "${make_threads}" && \
         make install
 fi

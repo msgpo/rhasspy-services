@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 set -e
 
+# Check for help
+for arg in "$@";
+do
+    if [[ "${arg}" == '--help' ]]; then
+        phonetisaurus-apply --help
+        exit 0
+    fi
+done
+
+# -----------------------------------------------------------------------------
+
 temp_list="$(mktemp)"
 function finish {
     rm -f "${temp_list}"
