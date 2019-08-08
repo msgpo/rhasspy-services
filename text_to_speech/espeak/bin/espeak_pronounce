@@ -6,6 +6,7 @@ import logging
 import subprocess
 import time
 import tempfile
+import shlex
 
 logger = logging.getLogger("espeak_pronounce")
 
@@ -30,6 +31,9 @@ def main():
         "--espeak-word", action="store_true", help="Prononuce word with espeak too"
     )
     parser.add_argument(
+        "--play-program", help="Program to pipe WAV data into via stdin"
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to the console"
     )
     args, rest_args = parser.parse_known_args()
@@ -43,9 +47,28 @@ def main():
         logger.fatal("Either --dictionary or --g2p-model is required")
         sys.exit(1)
 
+    if args.play_program is not None:
+        # Split into command and arguments
+        args.play_program = shlex.split(args.play_program)
+
     all_arpas = set()
     word_to_arpa = {}
     has_dictionary = args.dictionary is not None
+
+    # Load espeak map
+    arpa_to_espeak = {}
+    with open(args.phoneme_map, "r") as map_file:
+        for line in map_file:
+            line = line.strip()
+            if len(line) == 0:
+                continue
+
+            arpa, espeak = re.split(r"\s+", line)
+            arpa_to_espeak[arpa] = espeak
+            all_arpas.add(arpa)
+
+    if args.debug:
+        logger.debug(arpa_to_espeak)
 
     if has_dictionary:
         # Load dictionary
@@ -61,21 +84,9 @@ def main():
                     continue
 
                 word_to_arpa[word] = re.split(r"\s+", arpas)
-                all_arpas.update(word_to_arpa[word])
 
-    # Load espeak map
-    arpa_to_espeak = {}
-    with open(args.phoneme_map, "r") as map_file:
-        for line in map_file:
-            line = line.strip()
-            if len(line) == 0:
-                continue
-
-            arpa, espeak = re.split(r"\s+", line)
-            arpa_to_espeak[arpa] = espeak
-
-            if has_dictionary:
-                assert arpa in all_arpas, f"Missing {arpa} from espeak map"
+                for arpa in arpas:
+                    assert arpa in all_arpas, f"Missing {arpa} from espeak map"
 
     for word in sys.stdin:
         word = word.strip()
@@ -96,10 +107,7 @@ def main():
             espeaks = subprocess.check_output(espeak_cmd).decode().strip()
             print(word, espeaks)
 
-            espeak_cmd = ["espeak-ng", "-s", "80"] + rest_args + [word]
-            logger.debug(espeak_cmd)
-
-            subprocess.check_call(espeak_cmd)
+            play_espeak(["espeak-ng", "-s", "80"] + rest_args, word, args.play_espeak)
             time.sleep(args.pause)
 
         if has_dictionary:
@@ -133,12 +141,37 @@ def main():
         espeak_str = "".join(espeaks)
         logger.debug(espeak_str)
 
-        espeak_cmd = ["espeak-ng", "-s", "80"] + rest_args + [f"[[{espeak_str}]]"]
+        print(word, " ".join(f"{a}/{e}" for a, e in zip(arpas, espeaks)))
+
+        play_espeak(
+            ["espeak-ng", "-s", "80"] + rest_args,
+            f"[[{espeak_str}]]",
+            args.play_program,
+        )
+        time.sleep(args.pause)
+
+
+# -----------------------------------------------------------------------------
+
+
+def play_espeak(espeak_cmd, espeak_str, play_program=None):
+    if play_program is None:
+        # Play through espeak
+        espeak_cmd.append(espeak_cmd)
         logger.debug(espeak_cmd)
 
-        print(word, " ".join(f"{a}/{e}" for a, e in zip(arpas, espeaks)))
         subprocess.check_call(espeak_cmd)
-        time.sleep(args.pause)
+    else:
+        # Use other program
+        espeak_cmd.extend(["--stdout", espeak_str])
+        logger.debug(espeak_cmd)
+
+        # Get WAV data
+        wav_data = subprocess.check_output(espeak_cmd)
+
+        # Play WAV data
+        logging.debug(play_program)
+        subprocess.run(play_program, input=wav_data)
 
 
 # -----------------------------------------------------------------------------

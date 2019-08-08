@@ -33,7 +33,10 @@
 !wake_word/porcupine/resources/
 !wake_word/porcupine/porcupine_rhasspy/*.py
 
-# Training
+# espeak
+!text_to_speech/espeak/bin/
+
+# training
 !training/requirements.txt
 !training/*.py
 !training/bin/

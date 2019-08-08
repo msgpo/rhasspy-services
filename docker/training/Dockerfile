@@ -40,6 +40,15 @@ RUN tar -xf /sphinxbase.tar.gz && \
     make -j $MAKE_THREADS && \
     make install
 
+# espeak-ng
+COPY download/espeak-ng-1.49.2.tar.gz /
+RUN tar -xf /espeak-ng-1.49.2.tar.gz && \
+    cd espeak-ng-1.49.2 && \
+    ./autogen.sh && \
+    ./configure --prefix=/build && \
+    make -j $MAKE_THREADS src/espeak-ng src/speak-ng && \
+    make install
+
 # -----------------------------------------------------------------------------
 
 FROM alpine
@@ -49,12 +58,14 @@ RUN apk update && \
         bash \
         python3 \
         python3-dev \
-        mosquitto-clients
+        mosquitto-clients \
+        alsa-utils
 
 # Copy pre-built artifacts
 COPY --from=builder /build/bin/* /usr/bin/
 COPY --from=builder /build/lib/*.so /usr/lib/
 COPY --from=builder /build/include/ /usr/include/
+COPY --from=builder /build/share/espeak-ng-data /build/share/espeak-ng-data/
 
 # Re-create symbolic links
 RUN ln -s /usr/lib/libfstfarscript.so /usr/lib/libfstfarscript.so.13 && \
@@ -62,7 +73,8 @@ RUN ln -s /usr/lib/libfstfarscript.so /usr/lib/libfstfarscript.so.13 && \
     ln -s /usr/lib/libfstfar.so /usr/lib/libfstfar.so.13 && \
     ln -s /usr/lib/libfst.so /usr/lib/libfst.so.13 && \
     ln -s /usr/lib/libngram.so /usr/lib/libngram.so.134 && \
-    ln -s /usr/lib/libsphinxbase.so /usr/lib/libsphinxbase.so.3
+    ln -s /usr/lib/libsphinxbase.so /usr/lib/libsphinxbase.so.3 && \
+    ln -s /usr/lib/libespeak-ng.so /usr/lib/libespeak-ng.so.1
 
 # jsgf2fst
 COPY download/jsgf2fst-0.1.2.tar.gz /download/
@@ -99,6 +111,9 @@ COPY ${PY_DIR}/vocab_g2p/bin/vocab_g2p  /usr/bin/
 COPY ${PY_DIR}/__init__.py ${PY_DIR}/__main__.py /rhasspy/${PY_DIR}/
 COPY ${PY_DIR}/bin/train  /usr/bin/
 COPY ${PY_DIR}/bin/train-mqtt  /usr/bin/
+
+# pronounce
+COPY text_to_speech/espeak/bin/espeak_pronounce /usr/bin/
 
 ENV shflags=/etc/shflags
 ENV PYTHONPATH=/rhasspy

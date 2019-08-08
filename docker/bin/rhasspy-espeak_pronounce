@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+uid="$(id -u)"
+docker run -it \
+       -v "${HOME}:${HOME}:ro" \
+       -v /etc/localtime:/etc/localtime:ro \
+       -w "${PWD}" \
+       --device /dev/snd \
+       --entrypoint espeak_pronounce \
+       rhasspy/training \
+       --play-program 'aplay' \
+       "$@"
