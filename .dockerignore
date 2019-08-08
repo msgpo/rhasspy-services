@@ -14,6 +14,7 @@
 !intent_recognition/fsticuffs/fsticuffs/*.py
 
 # kaldi
+!speech_to_text/kaldi/requirements.txt
 !speech_to_text/kaldi/*.py
 !speech_to_text/kaldi/bin/
 

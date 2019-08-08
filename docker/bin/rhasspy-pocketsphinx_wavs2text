@@ -4,6 +4,6 @@ docker run -i \
        -v "${HOME}:${HOME}" \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
-       --entrypoint kaldi \
-       rhasspy/speech-to-text/kaldi \
+       --entrypoint pocketsphinx_wavs2text \
+       rhasspy/speech-to-text/pocketsphinx \
        "$@"

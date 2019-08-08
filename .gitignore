@@ -18,3 +18,4 @@ debian/**/usr/lib/
 debian/**/opt/
 
 docs/notebooks/profile/
+docs/notebooks/wav_files.txt

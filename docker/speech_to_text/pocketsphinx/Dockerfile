@@ -4,10 +4,10 @@ RUN apk update && \
     apk add --no-cache \
         bash \
         netcat-openbsd \
-        python3 \
-        python3-dev \
+        python3 python3-dev \
         swig \
-        mosquitto-clients
+        mosquitto-clients \
+        sox jq
 
 ARG PY_DIR=speech_to_text/pocketsphinx
 
@@ -20,7 +20,7 @@ RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 COPY bin/yq /usr/bin/
 COPY etc/shflags /etc/
 
-COPY ${PY_DIR}/bin/pocketsphinx  /usr/bin/
+COPY ${PY_DIR}/bin/pocketsphinx ${PY_DIR}/bin/pocketsphinx_wavs2text  /usr/bin/
 COPY ${PY_DIR}/bin/pocketsphinx-mqtt /usr/bin/mqtt
 COPY ${PY_DIR}/bin/pocketsphinx-http /usr/bin/http
 

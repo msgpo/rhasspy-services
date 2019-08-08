@@ -32,13 +32,27 @@ RUN cd /kaldi-master/src && \
 FROM ubuntu:bionic
 
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip
+    apt-get install -y \
+        python3 python3-pip \
+        libatlas3-base \
+        sox bc jq
 
 COPY --from=builder /kaldi-master/egs/wsj/s5 /kaldi/egs/wsj/s5/
 COPY --from=builder /kaldi-master/tools/openfst-1.6.7/lib/*.so /kaldi/tools/openfst/lib/
+COPY --from=builder /kaldi-master/tools/openfst-1.6.7/bin /kaldi/tools/openfst/bin/
 COPY --from=builder /kaldi-master/src/lib/*.so /kaldi/src/lib/
 COPY --from=builder /kaldi-master/src/bin /kaldi/src/bin/
 COPY --from=builder /kaldi-master/src/fstbin /kaldi/src/fstbin/
+COPY --from=builder /kaldi-master/src/lmbin /kaldi/src/lmbin/
+COPY --from=builder /kaldi-master/src/gmmbin /kaldi/src/gmmbin/
+COPY --from=builder /kaldi-master/src/featbin /kaldi/src/featbin/
+COPY --from=builder /kaldi-master/src/online2bin /kaldi/src/online2bin/
+
+# Re-create symbolic links
+RUN ln -s /kaldi/tools/openfst/lib/libfstfarscript.so /kaldi/tools/openfst/lib/libfstfarscript.so.10 && \
+    ln -s /kaldi/tools/openfst/lib/libfstscript.so /kaldi/tools/openfst/lib/libfstscript.so.10 && \
+    ln -s /kaldi/tools/openfst/lib/libfstfar.so /kaldi/tools/openfst/lib/libfstfar.so.10 && \
+    ln -s /kaldi/tools/openfst/lib/libfst.so /kaldi/tools/openfst/lib/libfst.so.10
 
 ENV PY_DIR=speech_to_text/kaldi
 
@@ -51,9 +65,11 @@ COPY etc/shflags /etc/
 COPY ${PY_DIR}/__main__.py /rhasspy/${PY_DIR}/
 COPY ${PY_DIR}/bin/kaldi /usr/bin/
 COPY ${PY_DIR}/bin/kaldi-decode /usr/bin/
+COPY training/bin/kaldi-train /usr/bin/
 
 ENV shflags=/etc/shflags
 ENV PYTHONPATH=/rhasspy
+ENV kaldi_dir=/kaldi
 
 WORKDIR /rhasspy
 ENTRYPOINT ["bash"]

@@ -83,11 +83,6 @@ export LD_LIBRARY_PATH="${lib_dir}:${openfst_dir}/lib:${LD_LIBRARY_PATH}"
 # WAV files
 # -----------------------------------------------------------------------------
 
-if [[ -z "$1" ]]; then
-    echo "No WAV files given"
-    exit 1
-fi
-
 # Create temporary directory and clean it up when script finishes
 temp_dir="$(mktemp -d)"
 function finish {
@@ -107,8 +102,9 @@ total_wav_duration=0
 declare -A wav_durations
 
 # Write spk2utt and wav.scp files
-while [[ ! -z "$1" ]]; do
-    wav_path="$(realpath "$1")"
+while read -r wav_path;
+do
+    wav_path="$(realpath "${wav_path}")"
     wav_name="$(basename "${wav_path}")"
 
     # Record WAV durations for transcription timing calculations
@@ -122,7 +118,6 @@ while [[ ! -z "$1" ]]; do
 
     # Assume from a single speaker
     echo "corpus utt_${b64_name}" >> "${temp_dir}/spk2utt"
-    shift
 done
 
 # -----------------------------------------------------------------------------

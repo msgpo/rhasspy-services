@@ -11,6 +11,8 @@ trap cleanup EXIT
 
 touch "${audio}" "${events}"
 
+# -----------------------------------------------------------------------------
+
 while read -r wav_path;
 do
     echo 'start {}' >> "${events}"
