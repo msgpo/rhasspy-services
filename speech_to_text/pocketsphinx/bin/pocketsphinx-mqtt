@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# MQTT wrapper around rhasspy-pocketsphinx
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
@@ -25,6 +27,7 @@ DEFINE_integer 'audio-port' 5000 'Port for UDP audio input stream'
 DEFINE_string 'start-listening' 'rhasspy/speech-to-text/start-listening' 'Topic to start listening to audio stream'
 DEFINE_string 'stop-listening' 'rhasspy/speech-to-text/stop-listening' 'Topic to stop listening to audio stream'
 DEFINE_string 'text-captured' 'rhasspy/speech-to-text/text-captured' 'Topic for transcription response'
+DEFINE_string 'reload' 'rhasspy/speech-to-text/reload' 'Topic for reload request'
 
 # pocketsphinx
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
@@ -60,12 +63,14 @@ dictionary="${FLAGS_dictionary}"
 start_listening="${FLAGS_start_listening}"
 stop_listening="${FLAGS_stop_listening}"
 text_captured="${FLAGS_text_captured}"
+reload="${FLAGS_reload}"
 
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
     export profile_dir
     source <(yq "${profile_dir}/profile.yml" \
                 -q mqtt_host 'mqtt.host' "${mqtt_host}" \
@@ -77,7 +82,8 @@ if [[ ! -z "${profile_dir}" ]]; then
                 -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}" \
                 -q start_listening 'speech-to-text.mqtt-events.start-listening' "${start_listening}" \
                 -q stop_listening 'speech-to-text.mqtt-events.stop-listening' "${stop_listening}" \
-                -q text_captured 'speech-to-text.mqtt-events.text-captured' "${text_captured}" | \
+                -q text_captured 'speech-to-text.mqtt-events.text-captured' "${text_captured}" \
+                -q reload 'speech-to-text.mqtt-events.reload' "${reload}" | \
                  tee /dev/stderr)
 fi
 
@@ -107,8 +113,13 @@ fi
 
 nc -ukl "${audio_host}" "${audio_port}" | \
     pocketsphinx "${args[@]}" \
-           --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}" -t "${stop_listening}") \
+           --events-in-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}/#" -t "${stop_listening}/#") \
            --event-start "${start_listening}" \
-           --event-stop "${stop_listening}" | \
+           --event-stop "${stop_listening}" \
+           --event-reload "${reload}" \
+           --event-captured "${text_captured}" | \
     tee /dev/stderr | \
-    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${text_captured}"
+    while read -r topic json;
+    do
+        echo -n "${json}" | mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -s -t "${topic}"
+    done

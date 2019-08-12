@@ -59,7 +59,7 @@ def transcribe(
     decoder.end_utt()
     end_time = time.time()
 
-    logger.debug(f"Decoded WAV in {end_time - start_time} second(s)")
+    logger.debug(f"Decoded audio in {end_time - start_time} second(s)")
 
     transcription = ""
     decode_seconds = end_time - start_time
