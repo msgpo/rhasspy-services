@@ -13,15 +13,6 @@ fi
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
-# MQTT
-DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
-DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
-
-# Events
-DEFINE_string 'start-training' 'rhasspy/training/start-training' 'Topic for re-training request'
-DEFINE_string 'training-failed' 'rhasspy/training/training-failed' 'Topic for training failure response'
-DEFINE_string 'training-complete' 'rhasspy/training/training-complete' 'Topic for training completion response'
-
 # training
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
 DEFINE_string 'sentences-ini' '' 'Path to sentences.ini file'
@@ -49,9 +40,6 @@ set -e
 
 profile_dir="${FLAGS_profile}"
 
-mqtt_host="${FLAGS_mqtt_host}"
-mqtt_port="${FLAGS_mqtt_port}"
-
 # General settings
 sentences_ini="${FLAGS_sentences_ini}"
 intent_fst="${FLAGS_intent_fst}"
@@ -72,10 +60,6 @@ if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
     debug='--debug'
 fi
 
-start_training="${FLAGS_start_training}"
-training_failed="${FLAGS_training_failed}"
-training_complete="${FLAGS_training_complete}"
-
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
@@ -85,8 +69,6 @@ if [[ ! -z "${profile_dir}" ]]; then
     export profile_dir
 
     source <(yq "${profile_dir}/profile.yml" \
-                -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-                -q mqtt_port 'mqtt.port' "${mqtt_port}" \
                 -q sentences_ini 'training.sentences-file' "${sentences_ini}" \
                 -q g2p_model 'training.grapheme-to-phoneme-model' "${g2p_model}" \
                 -q intent_fst 'training.intent-fst' "${intent_fst}" \
@@ -97,10 +79,7 @@ if [[ ! -z "${profile_dir}" ]]; then
                 -q vocab 'training.vocabulary-file' "${vocab}" \
                 -q unknown 'training.unknown-words-file' "${unknown}" \
                 -q model_type 'training.kaldi.model-type' "${model_type}" \
-                -q model_dir 'training.kaldi.model-directory' "${model_dir}" \
-                -q start_training 'training.mqtt-events.start-training' "${start_training}" \
-                -q training_failed 'training.mqtt-events.training-failed' "${training_failed}" \
-                -q training_complete 'training.mqtt-events.training-complete' "${training_complete}" | \
+                -q model_dir 'training.kaldi.model-directory' "${model_dir}" | \
                  tee /dev/stderr)
 fi
 
@@ -144,95 +123,60 @@ fi
 
 # -----------------------------------------------------------------------------
 
-# Disable automatic exiting on error
-set +e
+# ini -> jsgf
+ini_jsgf \
+    --grammar-dir "${grammar_dir}" \
+    < "${sentences_ini}"
 
-failed_message='{}'
-error_file="${temp_dir}/error.log"
+# jsgf -> fst, arpa
+jsgf_fst_arpa \
+    --grammar-dir "${grammar_dir}" \
+    --fst "${intent_fst}" \
+    --arpa "${language_model}" \
+    --vocab "${vocab}"
 
-# Main loop
-mosquitto_sub -v -t "${start_training}" | while read -r line;
-do
-    echo "Training started"
+# vocab -> dict
+rm -f "${unknown}"
+vocab_dict \
+    --vocab "${vocab}" \
+    --dictionary "${base_dictionary}" \
+    --unknown "${unknown}" \
+    > "${dictionary}"
 
-    (
-        # ini -> jsgf
-        ini_jsgf \
-            --grammar-dir "${grammar_dir}" \
-            < "${sentences_ini}" \
-            2> "${error_file}" || exit 1
+# Check for unknown words
+if [[ ! -f "${unknown}" ]]; then
 
-        # jsgf -> fst, arpa
-        jsgf_fst_arpa \
-            --grammar-dir "${grammar_dir}" \
-            --fst "${intent_fst}" \
-            --arpa "${language_model}" \
-            --vocab "${vocab}" \
-            2> "${error_file}" || exit 1
+    # Check if Kaldi model training is required
+    if [[ ! -z "${model_type}" ]]; then
+        echo "Training kaldi model"
+        kaldi-train \
+            --kaldi-dir "${kaldi_dir}" \
+            --model-type "${model_type}" \
+            --model-dir "${model_dir}" \
+            --dictionary "${dictionary}" \
+            --language-model "${language_model}"
+    fi
 
-        # vocab -> dict
-        rm -f "${unknown}"
-        vocab_dict \
-            --vocab "${vocab}" \
-            --dictionary "${base_dictionary}" \
-            --unknown "${unknown}" \
-            > "${dictionary}" \
-            2> "${error_file}" || exit 1
+    # Success
+    echo "Training complete"
+else
+    # Handle unknown words
+    echo "Unknown words:"
+    cat "${unknown}"
+    echo ''
 
-        # Check for unknown words
-        if [[ ! -f "${unknown}" ]]; then
+    if [[ ! -z "${g2p_model}" ]]; then
+        # Use grapheme-to-phoneme model to guess pronunciations
+        guess="${temp_dir}/guess.json"
 
-            # Check if Kaldi model training is required
-            if [[ ! -z "${model_type}" ]]; then
-                echo "Training kaldi model"
-                kaldi-train \
-                    --kaldi-dir "${kaldi_dir}" \
-                    --model-type "${model_type}" \
-                    --model-dir "${model_dir}" \
-                    --dictionary "${dictionary}" \
-                    --language-model "${language_model}" \
-                    2>&1 > "${error_file}" || exit 1
-            fi
+        # Guess unknown words
+        echo "Guessing unknown word pronunciations with ${g2p_model}"
 
-            # Success
-            echo "Training complete"
-            mosquitto_pub -t "${training_complete}" -m '{}'
-        else
-            # Handle unknown words
-            echo "Unknown words:" | tee "${error_file}"
-            cat "${unknown}" | tee -a "${error_file}"
-            echo ''
+        vocab_g2p \
+            --model "${g2p_model}" \
+            --nbest "${nbest}" \
+            < "${unknown}"
 
-            if [[ ! -z "${g2p_model}" ]]; then
-                # Use grapheme-to-phoneme model to guess pronunciations
-                guess="${temp_dir}/guess.json"
-
-                # Guess unknown words
-                echo "Guessing unknown word pronunciations with ${g2p_model}"
-
-                echo '{ "error": "unknown words", "unknown_words": [' > "${guess}"
-                vocab_g2p \
-                    --model "${g2p_model}" \
-                    --nbest "${nbest}" \
-                    < "${unknown}" >> "${guess}"
-                echo ']}' >> "${guess}" \
-                     2> "${error_file}"
-
-                failed_message="$(jsonl . < "${guess}")"
-                echo 'Done guessing'
-
-                mosquitto_pub -t "${training_failed}" -m "${failed_message}"
-            else
-                # Simply report unknown words
-                exit 1
-            fi
-        fi
-    ) || (
-        # Report general errors
-        error_message="$(cat "${error_file}")"
-        echo "${error_message}"
-
-        failed_message="$(jq -n --arg m "${error_message}" '{error:$m}' | jsonl)"
-        mosquitto_pub -t "${training_failed}" -m "${failed_message}"
-    )
-done
+        echo 'Done guessing'
+    fi
+fi

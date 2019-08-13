@@ -11,6 +11,7 @@ DEFINE_string 'venv' "${this_dir}/.venv" 'Path to create virtual environment'
 DEFINE_string 'download-dir' "${this_dir}/download" 'Directory to cache downloaded files'
 DEFINE_string 'build-dir' "${this_dir}/build" 'Directory to build dependencies in'
 DEFINE_boolean 'no-create' false 'Do not re-create the virtual environment'
+DEFINE_boolean 'no-kaldi' false 'Do not install Kaldi speech recognizer'
 DEFINE_integer 'make-threads' 4 'Number of threads to use with make' 'j'
 
 FLAGS "$@" || exit $?
@@ -30,7 +31,14 @@ if [[ "${FLAGS_no_create}" -eq "${FLAGS_TRUE}" ]]; then
     no_create='true'
 fi
 
+if [[ "${FLAGS_no_kaldi}" -eq "${FLAGS_TRUE}" ]]; then
+    no_kaldi='true'
+fi
+
 make_threads="${FLAGS_make_threads}"
+
+mkdir -p "${download_dir}"
+mkdir -p "${build_dir}"
 
 # -----------------------------------------------------------------------------
 # Debian dependencies
@@ -262,7 +270,8 @@ if [[ ! -d "${sphinxbase_dir}/build" ]]; then
 
     tar -C "${build_dir}" -xf "${sphinxbase_file}" && \
         cd "${sphinxbase_dir}" && \
-        ./autogen.sh "--prefix=${sphinxbase_dir}/build" && \
+        ./autogen.sh  "--prefix=${sphinxbase_dir}/build" && \
+        ./autogen.sh  "--prefix=${sphinxbase_dir}/build" && \
         make -j "${make_threads}" && \
         make install
 fi
@@ -293,9 +302,9 @@ python3 -m pip install \
 # -----------------------------------------------------------------------------
 
 kaldi_dir="${build_dir}/kaldi-master"
-if [[ ! -d "${kaldi_dir}/build" ]]; then
+if [[ ! -z "${no_kaldi}" || ! -d "${kaldi_dir}/build" ]]; then
     echo "Installing kaldi"
-    install libatlas-dev libatlas3-base
+    install libatlas-base-dev libatlas3-base
     kaldi_file="${download_dir}/kaldi.tar.gz"
 
     if [[ ! -f "${kaldi_file}" ]]; then

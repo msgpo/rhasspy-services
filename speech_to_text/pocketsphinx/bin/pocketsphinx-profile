@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+if [[ -z "${shflags}" ]]; then
+    echo "Missing shflags"
+    exit 1
+fi
+
+. "${shflags}"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# pocketsphinx
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'acoustic-model' '' 'Path to pocketsphinx acoustic model directory (hmm)'
+DEFINE_string 'language-model' '' 'Path to pocketsphinx ARPA language model (lm)'
+DEFINE_string 'dictionary' '' 'Path to pocketsphinx pronunciation dictionary (dict)'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
+
+acoustic_model="${FLAGS_acoustic_model}"
+language_model="${FLAGS_language_model}"
+dictionary="${FLAGS_dictionary}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
+    export profile_dir
+    source <(yq "${profile_dir}/profile.yml" \
+                -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \
+                -q language_model 'speech-to-text.pocketsphinx.language-model' "${language_model}" \
+                -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}"  | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+
+args=("${debug}")
+
+if [[ ! -z "${acoustic_model}" ]]; then
+    args+=('--acoustic-model' "${acoustic_model}")
+fi
+
+if [[ ! -z "${language_model}" ]]; then
+    args+=('--language-model' "${language_model}")
+fi
+
+if [[ ! -z "${dictionary}" ]]; then
+    args+=('--dictionary' "${dictionary}")
+fi
+
+args+=("$@")
+
+# -----------------------------------------------------------------------------
+
+python3 -m speech_to_text.pocketsphinx "${args[@]}"
