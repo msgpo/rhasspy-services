@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-/ini_jsgf/ini_jsgf-cli "$@"

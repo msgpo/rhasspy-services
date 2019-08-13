@@ -1,1 +1,4 @@
 - /.venv/
+
+- /intent_recognition/intigo/openfst-1.6.9/
+- /intent_recognition/intigo/clingo-5.3.0/

@@ -174,11 +174,30 @@ def transcribe(
         if graph_dir:
             kaldi_cmd.extend(["--graph-dir", graph_dir])
 
-        kaldi_cmd.extend(["--", temp_file.name])
-
         # Execute kaldi decode
         logging.debug(kaldi_cmd)
-        return json.loads(subprocess.check_output(kaldi_cmd))
+
+        try:
+            result = json.loads(
+                subprocess.run(
+                    kaldi_cmd,
+                    input=f"{temp_file.name}\n".encode(),
+                    check=True,
+                    stdout=subprocess.PIPE,
+                ).stdout
+            )
+        except Exception as e:
+            logger.exception("transcribe")
+
+            # Empty result
+            result = {
+                "text": "",
+                "wav_name": "",
+                "wav_seconds": 0,
+                "transcribe_seconds": 0,
+            }
+
+        return result
 
 
 # -------------------------------------------------------------------------------------------------

@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-/vocab_dict/vocab_dict-cli "$@"

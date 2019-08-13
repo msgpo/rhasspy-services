@@ -13,6 +13,7 @@ run/wav/cache/
 
 *.deb
 /intent_recognition/fsticuffs/openfst-1.6.9/
+/intent_recognition/intigo/clingo-5.3.0/
 
 debian/**/usr/lib/
 debian/**/opt/

@@ -212,21 +212,24 @@ function to_json {
             total_seconds="$(bc <<<"${end_time}-${start_time}")"
         fi
 
-        wav_name="$(echo "${b64_name}" | base64 -d)"
+        (
+            wav_name="$(echo "${b64_name}" | base64 -d)"
 
-        # Compute decode time by assuming that each WAV file took an amount of
-        # time proportional to its real-time duration.
-        wav_duration="${wav_durations["${wav_name}"]}"
-        duration_proportion="$(bc -l <<<"${wav_duration}/${total_wav_duration}")"
-        transcribe_seconds="$(bc -l <<<"${duration_proportion}*${total_seconds}" | awk '{printf "%f", $0}')"
+            # Compute decode time by assuming that each WAV file took an amount of
+            # time proportional to its real-time duration.
+            wav_duration="${wav_durations["${wav_name}"]}"
+            duration_proportion="$(bc -l <<<"${wav_duration}/${total_wav_duration}")"
+            transcribe_seconds="$(bc -l <<<"${duration_proportion}*${total_seconds}" | awk '{printf "%f", $0}')"
 
-        # Augment transcription with wav name and decode time
-        jq -n -c \
-           --arg t "${text}" \
-           --argjson ws "${wav_duration}" \
-           --arg wn "${wav_name}" \
-           --argjson ts "${transcribe_seconds}" \
-           '{ text: $t, wav_name: $wn, wav_seconds: $ws, transcribe_seconds: $ts }'
+            # Augment transcription with wav name and decode time
+            jq -n -c \
+               --arg t "${text}" \
+               --argjson ws "${wav_duration}" \
+               --arg wn "${wav_name}" \
+               --argjson ts "${transcribe_seconds}" \
+               '{ text: $t, wav_name: $wn, wav_seconds: $ws, transcribe_seconds: $ts }'
+
+        ) || continue
     done
 }
 

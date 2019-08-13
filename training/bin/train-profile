@@ -78,6 +78,7 @@ if [[ ! -z "${profile_dir}" ]]; then
                 -q grammar_dir 'training.grammar-directory' "${grammar_dir}" \
                 -q vocab 'training.vocabulary-file' "${vocab}" \
                 -q unknown 'training.unknown-words-file' "${unknown}" \
+                -q kaldi_dir 'training.kaldi.kaldi-directory' "${kaldi_dir}" \
                 -q model_type 'training.kaldi.model-type' "${model_type}" \
                 -q model_dir 'training.kaldi.model-directory' "${model_dir}" | \
                  tee /dev/stderr)
