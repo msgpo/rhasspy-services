@@ -2,7 +2,7 @@ Package: rhasspy-pocketsphinx
 Version: 1.0
 Section: utils
 Priority: optional
-Depends: jq, sox, rhasspy-yq (=1.0)
+Depends: jq, sox, mosquitto-clients, netcat, rhasspy-yq (=1.0)
 Architecture: amd64
 Maintainer: Michael Hansen
 Description: Pocketsphinx-based speech recognition tool for Rhasspy voice assistant

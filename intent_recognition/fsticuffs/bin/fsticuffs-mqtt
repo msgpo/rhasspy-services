@@ -24,6 +24,8 @@ DEFINE_string 'intent-recognized' 'rhasspy/intent-recognition/intent-recognized'
 # fsticuffs
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
 DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
+DEFINE_boolean 'skip-unknown' false 'Skip tokens not present in FST input symbol table'
+DEFINE_boolean 'fuzzy' false 'Use fuzzy search (slower)'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -45,6 +47,14 @@ if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
     debug='--debug'
 fi
 
+if [[ "${FLAGS_skip_unknown}" -eq "${FLAGS_TRUE}" ]]; then
+    skip_unknown='true'
+fi
+
+if [[ "${FLAGS_fuzzy}" -eq "${FLAGS_TRUE}" ]]; then
+    fuzzy='true'
+fi
+
 recognize_intent="${FLAGS_recognize_intent}"
 intent_recognized="${FLAGS_intent_recognized}"
 
@@ -58,6 +68,8 @@ if [[ ! -z "${profile_dir}" ]]; then
                 -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                 -q mqtt_port 'mqtt.port' "${mqtt_port}" \
                 -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
+                -q skip_unknown 'intent-recognition.fsticuffs.skip_unknown' "${skip_unknown}" \
+                -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" \
                 -q recognize_intent 'intent-recognition.mqtt-events.recognize-intent' "${recognize_intent}" \
                 -q intent_recognized 'intent-recognition.mqtt-events.intent-recognized' "${intent_recognized}" | \
                  tee /dev/stderr)
@@ -69,6 +81,14 @@ args=("${debug}")
 
 if [[ ! -z "${intent_fst}" ]]; then
     args+=('--intent-fst' "${intent_fst}")
+fi
+
+if [[ ! -z "${skip_unknown}" ]]; then
+    args+=('--skip-unknown')
+fi
+
+if [[ ! -z "${fuzzy}" ]]; then
+    args+=('--fuzzy')
 fi
 
 args+=("$@")

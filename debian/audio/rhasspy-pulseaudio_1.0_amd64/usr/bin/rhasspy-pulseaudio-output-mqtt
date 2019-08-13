@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+export rhasspy_dir='/usr/lib/rhasspy'
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# MQTT
+DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
+DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+
+# Events
+DEFINE_string 'play-uri' 'rhasspy/audio-output/play-uri' 'Topic to receive uri play requests'
+DEFINE_string 'uri-played' 'rhasspy/audio-output/uri-played' 'Topic to send after uri is played'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+mqtt_host="${FLAGS_mqtt_host}"
+mqtt_port="${FLAGS_mqtt_port}"
+
+play_uri="${FLAGS_play_uri}"
+uri_played="${FLAGS_uri_played}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
+    export profile_dir
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
+                        -q uri_played 'audio-output.mqtt-events.uri-played' "${uri_played}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+
+# Disable automatic exit on error
+set +e
+
+rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${play_uri}/#" | \
+    while read -r topic json;
+    do
+        uri="$(echo -n "${json}" | jq '.uri')"
+
+        if [[ ! -z "${uri}" ]]; then
+            echo "${uri}"
+
+            # Play URI through speakers
+            gst-launch-1.0 \
+                uridecodebin uri="${uri}" ! \
+                pulsesink
+
+            # Use end of topic as response id
+            request_id="$(echo "${topic}" | sed -e "s|^${play_uri}||")"
+
+            # Report that playback is complete
+            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${uri_played}${request_id}" -m '{}'
+        fi
+    done

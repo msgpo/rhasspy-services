@@ -55,6 +55,7 @@ voice="${FLAGS_voice}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
     export profile_dir
     source <(yq "${profile_dir}/profile.yml" \
                 -q mqtt_host 'mqtt.host' "${mqtt_host}" \
@@ -66,6 +67,10 @@ if [[ ! -z "${profile_dir}" ]]; then
                 -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
                 -q voice 'text-to-speech.espeak.voice' "${voice}" | \
                  tee /dev/stderr)
+
+    if [[ -z "${cache_directory} "]]; then
+        cache_directory="${profile_dir}/tts_cache"
+    fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -77,6 +82,10 @@ if [[ ! -z "${voice}" ]]; then
 fi
 
 args+=("$@")
+
+if [[ -z "${cache_directory}" ]]; then
+    cache_directory="$(pwd)/tts_cache"
+fi
 
 # Create cache dir
 mkdir -p "${cache_directory}"
@@ -101,8 +110,7 @@ jsonl_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}/#" | \
             request_id="$(echo "${topic}" | sed -e "s|^${say_text}||")"
 
             # Request playback
-            jq -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
-                jsonl | \
+            jq -jc -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
                 mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_uri}${request_id}" -s
         fi
     done

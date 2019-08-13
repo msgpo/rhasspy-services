@@ -1,4 +1,6 @@
-.PHONY: debian-fsticuffs \
+.PHONY: debian-audio \
+        debian-espeak \
+        debian-fsticuffs \
         debian-kaldi \
         debian-languages \
         debian-pocketsphinx \
@@ -68,6 +70,7 @@ installer-kaldi:
 
 installer-pocketsphinx:
 	bash build.sh installer/speech_to_text/pocketsphinx.spec
+	bash build.sh installer/speech_to_text/pocketsphinx-http.spec
 
 installer-porcupine:
 	bash build.sh installer/wake_word/porcupine.spec
@@ -82,12 +85,22 @@ installer-train:
 installer-webrtcvad:
 	bash build.sh installer/voice_command/webrtcvad.spec
 
-installer-yq:
+installer-utils:
 	bash build.sh installer/yq.spec
+	bash build.sh installer/jsonl-sub.spec
 
 # -----------------------------------------------------------------------------
 # Debian
 # -----------------------------------------------------------------------------
+
+debian-assistant:
+	cd debian/assistnat && fakeroot dpkg --build rhasspy-assistant-en-us_1.0_$(FRIENDLY_ARCH)
+
+debian-audio:
+	cd debian/audio && fakeroot dpkg --build rhasspy-pulseaudio_1.0_$(FRIENDLY_ARCH)
+
+debian-espeak:
+	cd debian/text_to_speech && fakeroot dpkg --build rhasspy-espeak_1.0_$(FRIENDLY_ARCH)
 
 debian-fsticuffs: installer-fsticuffs
 	bash debianize.sh intent_recognition fsticuffs $(FRIENDLY_ARCH)
@@ -100,6 +113,8 @@ debian-languages:
 	cd debian/languages && fakeroot dpkg --build rhasspy-en-us-pocketsphinx-cmu_1.0_all
 
 debian-pocketsphinx: installer-pocketsphinx
+	rsync -av --delete dist/pocketsphinx-http/ \
+        debian/speech_to_text/rhasspy-pocketsphinx_1.0_$(FRIENDLY_ARCH)/usr/lib/rhasspy/pocketsphinx-http/
 	bash debianize.sh speech_to_text pocketsphinx $(FRIENDLY_ARCH)
 
 debian-porcupine: installer-porcupine
@@ -109,8 +124,9 @@ debian-train: installer-train
 	rsync -av dist/ini_jsgf/ dist/vocab_g2p/ dist/vocab_dict/ dist/jsgf_fst_arpa/ dist/train/
 	bash debianize.sh training train $(FRIENDLY_ARCH)
 
-debian-utils: installer-yq
+debian-utils: installer-utils
 	bash debianize.sh utils yq $(FRIENDLY_ARCH)
+	bash debianize.sh utils jsonl-sub $(FRIENDLY_ARCH)
 
 debian-webrtcvad: installer-webrtcvad
 	bash debianize.sh voice_command webrtcvad $(FRIENDLY_ARCH)

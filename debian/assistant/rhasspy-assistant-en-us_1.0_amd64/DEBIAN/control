@@ -1,0 +1,8 @@
+Package: rhasspy-assistant-en-us
+Version: 1.0
+Section: utils
+Priority: optional
+Depends: supervisord, rhasspy-en-us-pocketsphinx-cmu (=1.0), rhasspy-train (=1.0), rhasspy-fsticuffs (=1.0), rhasspy-espeak (=1.0), rhasspy-webrtcvad (=1.0), rhasspy-porcupine (=1.0), rhasspy-jq (=1.0)
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: U.S. English voice assistant based on Rhasspy

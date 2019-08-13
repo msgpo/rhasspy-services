@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+
+# MQTT wrapper around porcupine
+
+export rhasspy_dir='/usr/lib/rhasspy'
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# MQTT
+DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
+DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+
+# Audio
+DEFINE_string 'audio-host' '0.0.0.0' 'Host for UDP audio input stream'
+DEFINE_integer 'audio-port' 5000 'Port for UDP audio input stream'
+
+# Events
+DEFINE_string 'start-listening' 'rhasspy/wake-word/start-listening' 'Topic to start listening to audio stream'
+DEFINE_string 'stop-listening' 'rhasspy/wake-word/stop-listening' 'Topic to stop listening to audio stream'
+DEFINE_string 'detected' 'rhasspy/wake-word/detected' 'Topic for wake word detection event'
+
+# porcupine
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'library' "${porcupine_library}" 'Path to libpv_porcupine.so'
+DEFINE_string 'model' "${porcupine_model}" 'Path to porcupine_params.pv'
+DEFINE_string 'keyword' "${porcupine_keyword}" 'Path to keyword file (.ppn)'
+DEFINE_boolean 'auto-start' false 'Start listening immediately'
+DEFINE_float 'sensitivity' '0.5' 'Sensitivity of keyword(s) (0-1)'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+mqtt_host="${FLAGS_mqtt_host}"
+mqtt_port="${FLAGS_mqtt_port}"
+
+audio_host="${FLAGS_audio_host}"
+audio_port="${FLAGS_audio_port}"
+
+library="${FLAGS_library}"
+model="${FLAGS_model}"
+keyword="${FLAGS_keyword}"
+sensitivty="${FLAGS_sensitivty}"
+
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
+
+if [[ "${FLAGS_auto_start}" -eq "${FLAGS_TRUE}" ]]; then
+    auto_start='--auto-start'
+fi
+
+start_listening="${FLAGS_start_listening}"
+stop_listening="${FLAGS_stop_listening}"
+detected="${FLAGS_detected}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
+    export profile_dir
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q audio_host 'wake-word.audio-input.host' "${audio_host}" \
+                        -q audio_port 'wake-word.audio-input.port' "${audio_port}" \
+                        -q library 'wake-word.porcupine.library' "${library}" \
+                        -q model 'wake-word.porcupine.model' "${model}" \
+                        -q keyword 'wake-word.porcupine.keyword' "${keyword}" \
+                        -q start_listening 'wake-word.mqtt-events.start-listening' "${start_listening}" \
+                        -q stop_listening 'wake-word.mqtt-events.stop-listening' "${stop_listening}" \
+                        -q detected 'wake-word.mqtt-events.detected' "${detected}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+
+args=("${debug}" "${auto_start}")
+
+if [[ ! -z "${library}" ]]; then
+    args+=('--library' "${library}")
+else
+    args+=('--library' "${rhasspy_dir}/porcupine/lib/x86_64/libpv_porcupine.so")
+fi
+
+if [[ ! -z "${model}" ]]; then
+    args+=('--model' "${model}")
+else
+    args+=('--model' "${rhasspy_dir}/porcupine/lib/common/porcupine_params.pv")
+fi
+
+if [[ ! -z "${keyword}" ]]; then
+    args+=('--keyword' "${keyword}")
+else
+    args+=('--keyword' "${rhasspy_dir}/porcupine/resources/keyword_files/linux/porcupine_linux.ppn")
+fi
+
+if [[ ! -z "${sensitivty}" ]]; then
+    args+=('--sensitivity' "${sensitivty}")
+fi
+
+args+=("$@")
+
+if [[ ! -z "${debug}" ]]; then
+    echo "Expecting UDP audio stream at ${audio_host}:${audio_port}"
+fi
+
+nc -ukl "${audio_host}" "${audio_port}" | \
+    rhasspy-porcupine \
+        "${args[@]}" \
+        --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}" -t "${stop_listening}") \
+        --event-start "${start_listening}" \
+        --event-stop "${stop_listening}" | \
+    tee /dev/stderr | \
+    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${detected}"

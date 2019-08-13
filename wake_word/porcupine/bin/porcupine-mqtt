@@ -31,6 +31,7 @@ DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
 DEFINE_string 'library' "${porcupine_library}" 'Path to libpv_porcupine.so'
 DEFINE_string 'model' "${porcupine_model}" 'Path to porcupine_params.pv'
 DEFINE_string 'keyword' "${porcupine_keyword}" 'Path to keyword file (.ppn)'
+DEFINE_boolean 'auto-start' false 'Start listening immediately'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -57,6 +58,10 @@ if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
     debug='--debug'
 fi
 
+if [[ "${FLAGS_auto_start}" -eq "${FLAGS_TRUE}" ]]; then
+    auto_start='--auto-start'
+fi
+
 start_listening="${FLAGS_start_listening}"
 stop_listening="${FLAGS_stop_listening}"
 detected="${FLAGS_detected}"
@@ -66,6 +71,7 @@ detected="${FLAGS_detected}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
     export profile_dir
     source <(yq "${profile_dir}/profile.yml" \
                 -q mqtt_host 'mqtt.host' "${mqtt_host}" \
@@ -83,18 +89,24 @@ fi
 
 # -----------------------------------------------------------------------------
 
-args=("${debug}")
+args=("${debug}" "${auto_start}")
 
 if [[ ! -z "${library}" ]]; then
     args+=('--library' "${library}")
+else
+    args+=('--library' "${profile_dir}/porcupine/lib/x86_64/libpv_porcupine.so")
 fi
 
 if [[ ! -z "${model}" ]]; then
     args+=('--model' "${model}")
+else
+    args+=('--model' "${profile_dir}/porcupine/lib/common/porcupine_params.pv")
 fi
 
 if [[ ! -z "${keyword}" ]]; then
     args+=('--keyword' "${keyword}")
+else
+    args+=('--keyword' "${profile_dir}/porcupine/resources/keyword_files/linux/porcupine_linux.ppn")
 fi
 
 args+=("$@")

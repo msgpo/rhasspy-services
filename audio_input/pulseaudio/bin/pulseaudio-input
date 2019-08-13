@@ -49,8 +49,7 @@ if [[ ! -z "${cli_clients}" ]]; then
 fi
 
 if [[ -z "${client_str}" ]]; then
-    echo "At least one client is required."
-    exit 1
+    client_str='127.0.0.1:5000'
 fi
 
 echo "Sending audio to ${client_str}"

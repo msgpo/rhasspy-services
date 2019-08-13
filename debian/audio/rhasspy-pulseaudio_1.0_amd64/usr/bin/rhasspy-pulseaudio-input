@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+export rhasspy_dir='/usr/lib/rhasspy'
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+DEFINE_string 'clients' '' 'HOST:PORT,HOST:PORT' 'c'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+cli_clients="${FLAGS_clients}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
+    export profile_dir
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                       -q clients 'audio-input.pulseaudio.clients' '' | \
+            tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+
+clients+=("$@")
+client_str="$(echo "${clients[@]}" | sed -e 's/ /,/g')"
+
+if [[ ! -z "${cli_clients}" ]]; then
+    client_str="${client_str},${cli_clients}"
+fi
+
+if [[ -z "${client_str}" ]]; then
+    client_str='127.0.0.1:5000'
+fi
+
+echo "Sending audio to ${client_str}"
+
+gst-launch-1.0 \
+    pulsesrc ! \
+    audioconvert ! \
+    audioresample ! \
+    audio/x-raw, rate=16000, channels=1, format=S16LE ! \
+    multiudpsink clients="${client_str}"

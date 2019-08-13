@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+export rhasspy_dir='/usr/lib/rhasspy'
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# MQTT
+DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
+DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+
+# Events
+DEFINE_string 'say-text' 'rhasspy/text-to-speech/say-text' 'Topic for text to speech request'
+DEFINE_string 'play-uri' 'rhasspy/audio-output/play-uri' 'Topic for uri audio output'
+
+# Cache
+DEFINE_string 'base-uri' '' 'Base uri for play requests'
+DEFINE_string 'cache-directory' '' 'Directory to cache WAV files'
+
+# espeak
+DEFINE_string 'voice' '' 'espeak voice'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+mqtt_host="${FLAGS_mqtt_host}"
+mqtt_port="${FLAGS_mqtt_port}"
+
+say_text="${FLAGS_say_text}"
+play_uri="${FLAGS_play_uri}"
+
+base_uri="${FLAGS_base_uri}"
+cache_directory="${FLAGS_cache_directory}"
+
+voice="${FLAGS_voice}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
+    export profile_dir
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q say_text 'text-to-speech.mqtt-events.say-text' "${say_text}" \
+                        -q voice 'text-to-speech.espeak.voice' "${voice}" \
+                        -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
+                        -q base_uri 'text-to-speech.cache.base-uri' "${base_uri}" \
+                        -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
+                        -q voice 'text-to-speech.espeak.voice' "${voice}" | \
+                 tee /dev/stderr)
+
+    if [[ -z "${cache_directory}" ]]; then
+        cache_directory="${profile_dir}/tts_cache"
+    fi
+fi
+
+# -----------------------------------------------------------------------------
+
+args=()
+
+if [[ ! -z "${voice}" ]]; then
+    args+=('-v' "${voice}")
+fi
+
+args+=("$@")
+
+if [[ -z "${cache_directory}" ]]; then
+    cache_directory="$(pwd)/tts_cache"
+fi
+
+if [[ -z "${base_uri}" ]]; then
+    base_uri="file://${cache_directory}"
+fi
+
+# Create cache dir
+mkdir -p "${cache_directory}"
+
+# -----------------------------------------------------------------------------
+
+# Disable automatic exit on error
+set +e
+
+rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}/#" | \
+    while read -r topic json;
+    do
+        text="$(echo "${json}" | jq '.text')"
+        if [[ ! -z "${text}" ]]; then
+            echo "${text}"
+
+            # Cache WAV file
+            filename="$(echo "${text}" | md5sum | awk '{ print $1 }').wav"
+            espeak-ng --stdout "${args[@]}" "${text}" > "${cache_directory}/${filename}"
+
+            # Use end of topic as response id
+            request_id="$(echo "${topic}" | sed -e "s|^${say_text}||")"
+
+            # Request playback
+            jq -jc -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
+                mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_uri}${request_id}" -s
+        fi
+    done

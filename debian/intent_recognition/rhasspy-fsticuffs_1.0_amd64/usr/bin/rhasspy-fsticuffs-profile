@@ -13,6 +13,8 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 # fsticuffs
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
 DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
+DEFINE_boolean 'skip-unknown' false 'Skip tokens not present in FST input symbol table'
+DEFINE_boolean 'fuzzy' false 'Use fuzzy search (slower)'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -31,6 +33,14 @@ if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
     debug='--debug'
 fi
 
+if [[ "${FLAGS_skip_unknown}" -eq "${FLAGS_TRUE}" ]]; then
+    skip_unknown='true'
+fi
+
+if [[ "${FLAGS_fuzzy}" -eq "${FLAGS_TRUE}" ]]; then
+    fuzzy='true'
+fi
+
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
@@ -39,7 +49,9 @@ if [[ ! -z "${profile_dir}" ]]; then
     profile_dir="$(realpath "${profile_dir}")"
     export profile_dir
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
-                        -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" | \
+                        -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
+                        -q skip_unknown 'intent-recognition.fsticuffs.skip_unknown' "${skip_unknown}" \
+                        -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" | \
                  tee /dev/stderr)
 fi
 
@@ -51,6 +63,13 @@ if [[ ! -z "${intent_fst}" ]]; then
     args+=('--intent-fst' "${intent_fst}")
 fi
 
+if [[ ! -z "${skip_unknown}" ]]; then
+    args+=('--skip-unknown')
+fi
+
+if [[ ! -z "${fuzzy}" ]]; then
+    args+=('--fuzzy')
+fi
 args+=("$@")
 
 rhasspy-fsticuffs "${args[@]}"

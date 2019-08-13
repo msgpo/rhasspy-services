@@ -1,0 +1,7 @@
+Package: rhasspy-yq
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: Utility for querying a YAML file in Bash scripts

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+export rhasspy_dir='/usr/lib/rhasspy'
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# supervisord
+DEFINE_string 'supervisord-conf' '' 'Path to supervisord conf file'
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+supervisord_conf="${FLAGS_supervisord_conf}"
+
+if [[ -z "${supervisord_conf}" ]]; then
+    supervisord_conf="${rhasspy_dir}/assistant/en-us.supervisord.conf"
+    echo "Using ${supervisord_conf}" > /dev/stderr
+fi
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ -z "${profile_dir}" ]]; then
+    echo "Profile is required"
+    exit 1
+fi
+
+export profile_dir="$(realpath "${profile_dir}")"
+
+# -----------------------------------------------------------------------------
+# Run assistant
+# -----------------------------------------------------------------------------
+
+supervisord -c "${supervisord_conf}"

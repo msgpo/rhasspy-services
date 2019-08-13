@@ -1,0 +1,8 @@
+Package: rhasspy-espeak
+Version: 1.0
+Section: utils
+Priority: optional
+Depends: espeak-ng, jq, mosquitto-clients, rhasspy-jsonl-sub (=1.0), rhasspy-yq (=1.0)
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: espeak-based text to speech for Rhasspy voice assistant

@@ -31,6 +31,7 @@ def main():
         "-t",
         metavar="topic",
         action="append",
+        default=[],
         help="mqtt topic to subscribe to. May be repeated multiple times.",
     )
     parser.add_argument(

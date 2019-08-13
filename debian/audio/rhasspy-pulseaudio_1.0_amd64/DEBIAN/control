@@ -1,0 +1,8 @@
+Package: rhasspy-pulseaudio
+Version: 1.0
+Section: utils
+Priority: optional
+Depends: gstreamer1.0-pulseaudio, gstreamer1.0-tools, gstreamer1.0-plugins-good, mosquitto-clients, rhasspy-jsonl-sub (=1.0), rhasspy-yq (=1.0)
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: Pulseaudio input and output for Rhasspy voice assistant
