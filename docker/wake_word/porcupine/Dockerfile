@@ -1,9 +1,8 @@
-FROM ubuntu:bionic
+FROM python:3.6-slim-stretch
 
 RUN apt-get update && \
     apt-get install -y \
         netcat-openbsd \
-        python3 python3-pip \
         mosquitto-clients
 
 ARG PY_DIR=wake_word/porcupine
