@@ -175,7 +175,7 @@ def main():
                 if args.audio_file_lines:
                     # Get next file path
                     audio_path = audio_file.readline().strip()
-                    logging.debug(f"Reading {audio_path}")
+                    logger.debug(f"Reading raw audio data from {audio_path}")
                     with open(audio_path, "rb") as actual_audio_file:
                         # Read entire file
                         audio_data[request_id] = actual_audio_file.read()

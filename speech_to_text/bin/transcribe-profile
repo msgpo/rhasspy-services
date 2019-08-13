@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+
+# Transcribes raw 16-bit 16Khz mono PCM audio from stdin using either
+# Pocketsphinx or Kaldi. Output is a jsonl object on stdout.
+
+# If the (Kaldi) model-type is present (via a --model-type argument or at
+# speech-to-text.kaldi.model-type in the profile), a Kaldi model is assumed.
+# Otherwise, Pocketsphinx is used.
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+if [[ -z "${shflags}" ]]; then
+    echo "Missing shflags"
+    exit 1
+fi
+
+. "${shflags}"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# pocketsphinx
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'acoustic-model' '' 'Path to pocketsphinx acoustic model directory (hmm)'
+DEFINE_string 'language-model' '' 'Path to pocketsphinx ARPA language model (lm)'
+DEFINE_string 'dictionary' '' 'Path to pocketsphinx pronunciation dictionary (dict)'
+
+# kaldi
+DEFINE_string 'kaldi-dir' "${kaldi_dir}" 'Path to kaldi top-level directory'
+DEFINE_string 'model-type' '' 'Type of kaldi model (gmm or nnet3)'
+DEFINE_string 'model-dir' '' 'Directory with kaldi model'
+DEFINE_string 'graph-dir' '' 'Directory with kaldi HCLG.fst (defaults to graph)'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
+
+acoustic_model="${FLAGS_acoustic_model}"
+language_model="${FLAGS_language_model}"
+dictionary="${FLAGS_dictionary}"
+
+kaldi_dir="${FLAGS_kaldi_dir}"
+model_type="${FLAGS_model_type}"
+model_dir="${FLAGS_model_dir}"
+graph_dir="${FLAGS_graph_dir}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
+    export profile_dir
+    source <(yq "${profile_dir}/profile.yml" \
+                -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \
+                -q language_model 'speech-to-text.pocketsphinx.language-model' "${language_model}" \
+                -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}"  \
+                -q kaldi_dir 'speech-to-text.kaldi.kaldi-directory' "${kaldi_dir}" \
+                -q model_dir 'speech-to-text.kaldi.model-directory' "${model_dir}" \
+                -q model_type 'speech-to-text.kaldi.model-type' "${model_type}" \
+                -q graph_dir 'speech-to-text.kaldi.graph-directory' "${graph_dir}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+# Transcribe
+# -----------------------------------------------------------------------------
+
+if [[ -z "${model_type}" ]]; then
+    # Pocketsphinx
+    args=("${debug}")
+
+    if [[ ! -z "${acoustic_model}" ]]; then
+        args+=('--acoustic-model' "${acoustic_model}")
+    fi
+
+    if [[ ! -z "${language_model}" ]]; then
+        args+=('--language-model' "${language_model}")
+    fi
+
+    if [[ ! -z "${dictionary}" ]]; then
+        args+=('--dictionary' "${dictionary}")
+    fi
+
+    args+=("$@")
+
+    # --------------------------------------------------------------------------
+
+    python3 -m speech_to_text.pocketsphinx "${args[@]}"
+else
+    # Kaldi
+    if [[ ! -d "${kaldi_dir}" ]]; then
+        echo "Kaldi does not exist at ${kaldi_dir}"
+        exit 1
+    fi
+
+    if [[ -z "${model_dir}" ]]; then
+        echo "Model directory is required"
+        exit 1
+    fi
+
+    if [[ ! -d "${model_dir}" ]]; then
+        echo "Model directory does not exist at ${model_dir}"
+        exit 1
+    fi
+
+    if [[ -z "${graph_dir}" ]]; then
+        graph_dir="${model_dir}/graph"
+    fi
+
+    # --------------------------------------------------------------------------
+
+    args=()
+
+    if [[ ! -z "${kaldi_dir}" ]]; then
+        args+=('--kaldi-dir' "${kaldi_dir}")
+    fi
+
+    if [[ ! -z "${model_dir}" ]]; then
+        args+=('--model-dir' "${model_dir}")
+    fi
+
+    if [[ ! -z "${model_type}" ]]; then
+        args+=('--model-type' "${model_type}")
+    fi
+
+    if [[ ! -z "${graph_dir}" ]]; then
+        args+=('--graph-dir' "${graph_dir}")
+    fi
+
+    args+=("$@")
+
+    # --------------------------------------------------------------------------
+
+    python3 -m speech_to_text.kaldi "${args[@]}"
+fi

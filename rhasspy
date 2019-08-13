@@ -22,6 +22,7 @@ rhasspy_paths=("${venv}/bin" "${this_dir}/bin")
 rhasspy_paths+=("${this_dir}/audio_output/pulseaudio/bin")
 rhasspy_paths+=("${this_dir}/intent_recognition/fsticuffs/bin")
 rhasspy_paths+=("${this_dir}/intent_recognition/flair/bin")
+rhasspy_paths+=("${this_dir}/speech_to_text/bin")
 rhasspy_paths+=("${this_dir}/speech_to_text/pocketsphinx/bin")
 rhasspy_paths+=("${this_dir}/speech_to_text/kaldi/bin")
 rhasspy_paths+=("${this_dir}/text_to_speech/espeak/bin")
@@ -42,6 +43,9 @@ export shflags="${this_dir}/etc/shflags"
 
 # Path to kaldi
 export kaldi_dir="${this_dir}/build/kaldi-master"
+
+# Path to base rhasspy directory
+export rhasspy_dir="${this_dir}"
 
 # Run command in Rhasspy venv
 "$@"

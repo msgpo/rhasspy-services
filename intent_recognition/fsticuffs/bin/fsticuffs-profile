@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+if [[ -z "${shflags}" ]]; then
+    echo "Missing shflags"
+    exit 1
+fi
+
+. "${shflags}"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# fsticuffs
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+intent_fst="${FLAGS_intent_fst}"
+
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    profile_dir="$(realpath "${profile_dir}")"
+    export profile_dir
+    source <(yq "${profile_dir}/profile.yml" \
+                -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+
+args=("${debug}")
+
+if [[ ! -z "${intent_fst}" ]]; then
+    args+=('--intent-fst' "${intent_fst}")
+fi
+
+args+=("$@")
+
+fsticuffs "${args[@]}"

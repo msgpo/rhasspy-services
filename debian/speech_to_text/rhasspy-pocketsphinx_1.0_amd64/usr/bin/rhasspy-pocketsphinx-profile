@@ -1,20 +1,14 @@
 #!/usr/bin/env bash
 
+export rhasspy_dir='/usr/lib/rhasspy'
+
 # -----------------------------------------------------------------------------
-# Default Settings
+# Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
-
-DEFINE_string 'http-host' '0.0.0.0' 'HTTP server address'
-DEFINE_integer 'http-port' 8000 'HTTP server port'
 
 # pocketsphinx
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
@@ -33,9 +27,6 @@ set -e
 
 profile_dir="${FLAGS_profile}"
 
-http_host="${FLAGS_http_host}"
-http_port="${FLAGS_http_port}"
-
 if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
     debug='--debug'
 fi
@@ -51,12 +42,10 @@ dictionary="${FLAGS_dictionary}"
 if [[ ! -z "${profile_dir}" ]]; then
     profile_dir="$(realpath "${profile_dir}")"
     export profile_dir
-    source <(yq "${profile_dir}/profile.yml" \
-                -q http_host http.host "${http_host}" \
-                -q http_port http.port "${http_port}" \
-                -q acoustic_model speech-to-text.pocketsphinx.acoustic-model "${acoustic_model}" \
-                -q language_model speech-to-text.pocketsphinx.language-model "${language_model}" \
-                -q dictionary speech-to-text.pocketsphinx.dictionary "${dictionary}" | \
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \
+                        -q language_model 'speech-to-text.pocketsphinx.language-model' "${language_model}" \
+                        -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}" | \
                  tee /dev/stderr)
 fi
 
@@ -79,33 +68,5 @@ fi
 args+=("$@")
 
 # -----------------------------------------------------------------------------
-# Temp Files and FIFOs
-# -----------------------------------------------------------------------------
 
-temp_dir="$(mktemp -d)"
-
-function finish {
-    rm -rf "${temp_dir}"
-}
-
-trap finish EXIT
-
-events_fifo="${temp_dir}/events"
-audio_fifo="${temp_dir}/audio"
-
-mkfifo "${events_fifo}"
-mkfifo "${audio_fifo}"
-
-# -----------------------------------------------------------------------------
-
-pocketsphinx "${args[@]}" \
-             --audio-file "${audio_fifo}" \
-             --audio-file-lines \
-             --events-in-file "${events_fifo}" \
-             --event-start 'start-listening' \
-             --event-stop 'stop-listening' | \
-    tee /dev/stderr | \
-    python3 -m speech_to_text.pocketsphinx.http_server \
-            --host "${http_host}" --port "${http_port}" \
-            --audio-file "${audio_fifo}" \
-            --events-file "${events_fifo}" "${debug}"
+rhasspy-pocketsphinx "${args[@]}"

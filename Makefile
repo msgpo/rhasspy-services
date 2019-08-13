@@ -1,5 +1,6 @@
 .PHONY: debian-fsticuffs \
         debian-kaldi \
+        debian-languages \
         debian-pocketsphinx \
         debian-porcupine \
         debian-train \
@@ -17,7 +18,8 @@
         installer-pocketsphinx \
         installer-porcupine \
         installer-train \
-        installer-webrtcvad
+        installer-webrtcvad \
+        installer-yq
 
 # -----------------------------------------------------------------------------
 
@@ -80,6 +82,9 @@ installer-train:
 installer-webrtcvad:
 	bash build.sh installer/voice_command/webrtcvad.spec
 
+installer-yq:
+	bash build.sh installer/yq.spec
+
 # -----------------------------------------------------------------------------
 # Debian
 # -----------------------------------------------------------------------------
@@ -90,6 +95,10 @@ debian-fsticuffs: installer-fsticuffs
 debian-kaldi: installer-kaldi
 	bash debianize.sh speech_to_text kaldi $(FRIENDLY_ARCH)
 
+debian-languages:
+	rsync -av --delete languages/english/en-us_pocketsphinx-cmu/ debian/languages/rhasspy-en-us-pocketsphinx-cmu_1.0_all/usr/lib/rhasspy/languages/english/en-us_pocketsphinx-cmu/
+	cd debian/languages && fakeroot dpkg --build rhasspy-en-us-pocketsphinx-cmu_1.0_all
+
 debian-pocketsphinx: installer-pocketsphinx
 	bash debianize.sh speech_to_text pocketsphinx $(FRIENDLY_ARCH)
 
@@ -99,6 +108,9 @@ debian-porcupine: installer-porcupine
 debian-train: installer-train
 	rsync -av dist/ini_jsgf/ dist/vocab_g2p/ dist/vocab_dict/ dist/jsgf_fst_arpa/ dist/train/
 	bash debianize.sh training train $(FRIENDLY_ARCH)
+
+debian-utils: installer-yq
+	bash debianize.sh utils yq $(FRIENDLY_ARCH)
 
 debian-webrtcvad: installer-webrtcvad
 	bash debianize.sh voice_command webrtcvad $(FRIENDLY_ARCH)
