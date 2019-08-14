@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-docker run -it \
-       -v "${HOME}:${HOME}:ro" \
-      -v '/etc/localtime:/etc/localtime:ro' \
-      --network host \
-      rhasspy/intent-recognition/fsticuffs \
-      "$@"

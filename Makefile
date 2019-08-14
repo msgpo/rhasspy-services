@@ -7,6 +7,7 @@
         debian-pocketsphinx \
         debian-porcupine \
         debian-train \
+        docker-assistant-en-us \
         docker-espeak \
         docker-fsticuffs \
         docker-kaldi \
@@ -31,6 +32,9 @@ FRIENDLY_ARCH ?= amd64
 # -----------------------------------------------------------------------------
 # Docker
 # -----------------------------------------------------------------------------
+
+docker-assistant-en-us:
+	docker build . -f docker/assistant/en-us/Dockerfile -t rhasspy/assistant/en-us
 
 docker-espeak:
 	docker build . -f docker/text_to_speech/espeak/Dockerfile -t rhasspy/text-to-speech/espeak

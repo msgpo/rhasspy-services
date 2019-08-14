@@ -116,7 +116,7 @@ COPY ${PY_DIR}/vocab_g2p/__init__.py ${PY_DIR}/vocab_g2p/__main__.py \
 COPY ${PY_DIR}/vocab_g2p/bin/rhasspy-vocab_g2p  /usr/bin/
 
 # train
-COPY ${PY_DIR}/__init__.py ${PY_DIR}/__main__.py /usr/lib/rhasspy/${PY_DIR}/
+COPY ${PY_DIR}/__init__.py /usr/lib/rhasspy/${PY_DIR}/
 COPY ${PY_DIR}/bin/rhasspy-*  /usr/bin/
 
 # pronounce
