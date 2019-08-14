@@ -6,7 +6,7 @@ block_cipher = None
 venv = os.path.join(os.getcwd(), ".venv")
 
 a = Analysis(
-    [os.path.join(os.getcwd(), "bin/yq")],
+    [os.path.join(os.getcwd(), "bin/rhasspy-yq")],
     pathex=["."],
     binaries=[],
     datas=[],
@@ -25,7 +25,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="yq",
+    name="rhasspy-yq",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

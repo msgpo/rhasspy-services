@@ -29,7 +29,7 @@ RUN export UNAME=$UNAME UID=1000 GID=1000 && \
     chmod 0440 /etc/sudoers.d/${UNAME} && \
     gpasswd -a ${UNAME} audio
 
-COPY ${PY_DIR}/docker/pulseaudio.client.conf /etc/pulse/client.conf
+COPY docker/audio_input/pulseaudio/pulseaudio.client.conf /etc/pulse/client.conf
 
 # Copy script to run
 COPY ${PY_DIR}/bin/pulseaudio-input /home/${UNAME}/

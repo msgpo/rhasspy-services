@@ -30,7 +30,7 @@ do
     echo "stop ${stop_data}" >> "${events}"
 done
 
-python3 -m speech_to_text.pocketsphinx \
+rhasspy-pocketsphinx \
         --audio-file "${audio}" \
         --audio-file-lines \
         --events-file "${events}" \

@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -55,17 +54,16 @@ voice="${FLAGS_voice}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_dir="$(realpath "${profile_dir}")"
-    export profile_dir
-    source <(yq "${profile_dir}/profile.yml" \
-                -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-                -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                -q say_text 'text-to-speech.mqtt-events.say-text' "${say_text}" \
-                -q voice 'text-to-speech.espeak.voice' "${voice}" \
-                -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
-                -q base_uri 'text-to-speech.cache.base-uri' "${base_uri}" \
-                -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
-                -q voice 'text-to-speech.espeak.voice' "${voice}" | \
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q say_text 'text-to-speech.mqtt-events.say-text' "${say_text}" \
+                        -q voice 'text-to-speech.espeak.voice' "${voice}" \
+                        -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
+                        -q base_uri 'text-to-speech.cache.base-uri' "${base_uri}" \
+                        -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
+                        -q voice 'text-to-speech.espeak.voice' "${voice}" | \
                  tee /dev/stderr)
 
     if [[ -z "${cache_directory}" ]]; then
@@ -95,7 +93,7 @@ mkdir -p "${cache_directory}"
 # Disable automatic exit on error
 set +e
 
-jsonl_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}/#" | \
+rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}/#" | \
     while read -r topic json;
     do
         text="$(echo "${json}" | jq '.text')"
@@ -104,7 +102,7 @@ jsonl_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}/#" | \
 
             # Cache WAV file
             filename="$(echo "${text}" | md5sum | awk '{ print $1 }').wav"
-            espeak --stdout "${args[@]}" "${text}" > "${cache_directory}/${filename}"
+            espeak-ng --stdout "${args[@]}" "${text}" > "${cache_directory}/${filename}"
 
             # Use end of topic as response id
             request_id="$(echo "${topic}" | sed -e "s|^${say_text}||")"

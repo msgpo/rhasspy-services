@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-/usr/lib/rhasspy/yq/yq "${@}"
+/usr/lib/rhasspy/yq/rhasspy-yq "${@}"

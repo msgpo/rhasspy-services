@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 
+# HTTP wrapper around rhasspy-pocketsphinx
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Default Settings
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -49,14 +50,13 @@ dictionary="${FLAGS_dictionary}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_dir="$(realpath "${profile_dir}")"
-    export profile_dir
-    source <(yq "${profile_dir}/profile.yml" \
-                -q http_host http.host "${http_host}" \
-                -q http_port http.port "${http_port}" \
-                -q acoustic_model speech-to-text.pocketsphinx.acoustic-model "${acoustic_model}" \
-                -q language_model speech-to-text.pocketsphinx.language-model "${language_model}" \
-                -q dictionary speech-to-text.pocketsphinx.dictionary "${dictionary}" | \
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q http_host http.host "${http_host}" \
+                        -q http_port http.port "${http_port}" \
+                        -q acoustic_model speech-to-text.pocketsphinx.acoustic-model "${acoustic_model}" \
+                        -q language_model speech-to-text.pocketsphinx.language-model "${language_model}" \
+                        -q dictionary speech-to-text.pocketsphinx.dictionary "${dictionary}" | \
                  tee /dev/stderr)
 fi
 
@@ -98,12 +98,13 @@ mkfifo "${audio_fifo}"
 
 # -----------------------------------------------------------------------------
 
-pocketsphinx "${args[@]}" \
-             --audio-file "${audio_fifo}" \
-             --audio-file-lines \
-             --events-in-file "${events_fifo}" \
-             --event-start 'start-listening' \
-             --event-stop 'stop-listening' | \
+rhasspy-pocketsphinx \
+    "${args[@]}" \
+    --audio-file "${audio_fifo}" \
+    --audio-file-lines \
+    --events-in-file "${events_fifo}" \
+    --event-start 'start-listening' \
+    --event-stop 'stop-listening' | \
     tee /dev/stderr | \
     python3 -m speech_to_text.pocketsphinx.http_server \
             --host "${http_host}" --port "${http_port}" \

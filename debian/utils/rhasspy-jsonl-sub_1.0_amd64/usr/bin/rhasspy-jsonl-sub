@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-/usr/lib/rhasspy/jsonl-sub/jsonl-sub "${@}"
+/usr/lib/rhasspy/jsonl-sub/rhasspy-jsonl-sub "${@}"

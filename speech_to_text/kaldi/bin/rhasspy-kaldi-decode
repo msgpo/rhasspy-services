@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 # kaldi
 DEFINE_string 'kaldi-dir' "${kaldi_dir}" 'Path to kaldi top-level directory'

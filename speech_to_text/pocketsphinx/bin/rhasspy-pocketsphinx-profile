@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -43,12 +42,11 @@ dictionary="${FLAGS_dictionary}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_dir="$(realpath "${profile_dir}")"
-    export profile_dir
-    source <(yq "${profile_dir}/profile.yml" \
-                -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \
-                -q language_model 'speech-to-text.pocketsphinx.language-model' "${language_model}" \
-                -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}"  | \
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \
+                        -q language_model 'speech-to-text.pocketsphinx.language-model' "${language_model}" \
+                        -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}"  | \
                  tee /dev/stderr)
 fi
 
@@ -72,4 +70,4 @@ args+=("$@")
 
 # -----------------------------------------------------------------------------
 
-python3 -m speech_to_text.pocketsphinx "${args[@]}"
+rhasspy-pocketsphinx "${args[@]}"

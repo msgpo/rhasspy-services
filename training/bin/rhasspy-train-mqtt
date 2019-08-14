@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 
+# MQTT wrapper around rhasspy-train
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -31,6 +32,7 @@ DEFINE_string 'language-model' '' 'Path to write ARPA language model'
 DEFINE_string 'dictionary' '' 'Path to write prune prounciation dictionary'
 DEFINE_string 'base-dictionary' '' 'Path to base prounciation dictionary'
 DEFINE_string 'grammar-dir' '' 'Path to write JSGF grammars'
+DEFINE_string 'slots-dir' '' 'Directory with slot files'
 DEFINE_string 'vocab' '' 'Path to sentence vocabulary'
 DEFINE_string 'unknown' '' 'Path to write unknown words'
 DEFINE_integer 'nbest' 5 'Number of pronunciation guesses for unknown words'
@@ -60,6 +62,7 @@ language_model="${FLAGS_language_model}"
 base_dictionary="${FLAGS_base_dictionary}"
 dictionary="${FLAGS_dictionary}"
 grammar_dir="${FLAGS_grammar_dir}"
+slots_dir="${FLAGS_slots_dir}"
 vocab="${FLAGS_vocab}"
 unknown="${FLAGS_unknown}"
 nbest="${FLAGS_nbest}"
@@ -94,6 +97,7 @@ if [[ ! -z "${profile_dir}" ]]; then
                 -q dictionary 'training.dictionary' "${dictionary}" \
                 -q base_dictionary 'training.base-dictionary' "${base_dictionary}" \
                 -q grammar_dir 'training.grammar-directory' "${grammar_dir}" \
+                -q slots_dir 'training.slots-directory' "${slots_dir}" \
                 -q vocab 'training.vocabulary-file' "${vocab}" \
                 -q unknown 'training.unknown-words-file' "${unknown}" \
                 -q model_type 'training.kaldi.model-type' "${model_type}" \
@@ -142,6 +146,11 @@ if [[ -z "${unknown}" ]]; then
     unknown="${temp_dir}/unknown.txt"
 fi
 
+jsgf_fst_args=()
+if [[ ! -z "${slots_dir}" ]]; then
+    jsgf_fst_args=('--slots-dir' "${slots_dir}")
+fi
+
 # -----------------------------------------------------------------------------
 
 # Disable automatic exiting on error
@@ -168,6 +177,7 @@ do
             --fst "${intent_fst}" \
             --arpa "${language_model}" \
             --vocab "${vocab}" \
+            "${jsgf_fst_args[@]}" \
             2> "${error_file}" || exit 1
 
         # vocab -> dict

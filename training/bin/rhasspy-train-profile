@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# training
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'sentences-ini' '' 'Path to sentences.ini file'
+DEFINE_string 'g2p-model' '' 'Path to OpenFST grapheme-to-phoneme model'
+DEFINE_string 'intent-fst' '' 'Path to write intent finite state transducer'
+DEFINE_string 'language-model' '' 'Path to write ARPA language model'
+DEFINE_string 'dictionary' '' 'Path to write prune prounciation dictionary'
+DEFINE_string 'base-dictionary' '' 'Path to base prounciation dictionary'
+DEFINE_string 'grammar-dir' '' 'Path to write JSGF grammars'
+DEFINE_string 'slots-dir' '' 'Directory with slot files'
+DEFINE_string 'vocab' '' 'Path to sentence vocabulary'
+DEFINE_string 'unknown' '' 'Path to write unknown words'
+DEFINE_integer 'nbest' 5 'Number of pronunciation guesses for unknown words'
+DEFINE_string 'kaldi-dir' "${kaldi_dir}" 'Path to kaldi top-level directory'
+DEFINE_string 'model-type' '' 'Kaldi model type (gmm or nnet3)'
+DEFINE_string 'model-dir' '' 'Kaldi model directory'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+# General settings
+sentences_ini="${FLAGS_sentences_ini}"
+intent_fst="${FLAGS_intent_fst}"
+g2p_model="${FLAGS_g2p_model}"
+language_model="${FLAGS_language_model}"
+base_dictionary="${FLAGS_base_dictionary}"
+dictionary="${FLAGS_dictionary}"
+grammar_dir="${FLAGS_grammar_dir}"
+slots_dir="${FLAGS_slots_dir}"
+vocab="${FLAGS_vocab}"
+unknown="${FLAGS_unknown}"
+nbest="${FLAGS_nbest}"
+
+# Kaldi settings
+model_type="${FLAGS_model_type}"
+model_dir="${FLAGS_model_dir}"
+
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q sentences_ini 'training.sentences-file' "${sentences_ini}" \
+                        -q g2p_model 'training.grapheme-to-phoneme-model' "${g2p_model}" \
+                        -q intent_fst 'training.intent-fst' "${intent_fst}" \
+                        -q language_model 'training.language-model' "${language_model}" \
+                        -q dictionary 'training.dictionary' "${dictionary}" \
+                        -q base_dictionary 'training.base-dictionary' "${base_dictionary}" \
+                        -q grammar_dir 'training.grammar-directory' "${grammar_dir}" \
+                        -q slots_dir 'training.slots-directory' "${slots_dir}" \
+                        -q vocab 'training.vocabulary-file' "${vocab}" \
+                        -q unknown 'training.unknown-words-file' "${unknown}" \
+                        -q kaldi_dir 'training.kaldi.kaldi-directory' "${kaldi_dir}" \
+                        -q model_type 'training.kaldi.model-type' "${model_type}" \
+                        -q model_dir 'training.kaldi.model-directory' "${model_dir}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+# Compile Arguments
+# -----------------------------------------------------------------------------
+
+args=()
+
+if [[ ! -z "${sentences_ini}" ]]; then
+    args+=('--sentences-ini' "${sentences_ini}")
+fi
+
+if [[ ! -z "${g2p_model}" ]]; then
+    args+=('--g2p-model' "${g2p_model}")
+fi
+
+if [[ ! -z "${intent_fst}" ]]; then
+    args+=('--intent-fst' "${intent_fst}")
+fi
+
+if [[ ! -z "${language_model}" ]]; then
+    args+=('--language-model' "${language_model}")
+fi
+
+if [[ ! -z "${dictionary}" ]]; then
+    args+=('--dictionary' "${dictionary}")
+fi
+
+if [[ ! -z "${base_dictionary}" ]]; then
+    args+=('--base-dictionary' "${base_dictionary}")
+fi
+
+if [[ ! -z "${grammar_dir}" ]]; then
+    args+=('--grammar-dir' "${grammar_dir}")
+fi
+
+if [[ ! -z "${slots_dir}" ]]; then
+    args+=('--slots-dir' "${slots_dir}")
+fi
+
+if [[ ! -z "${vocab}" ]]; then
+    args+=('--vocab' "${vocab}")
+fi
+
+if [[ ! -z "${unknown}" ]]; then
+    args+=('--unknown' "${unknown}")
+fi
+
+if [[ ! -z "${nbest}" ]]; then
+    args+=('--nbest' "${nbest}")
+fi
+
+if [[ ! -z "${kaldi_dir}" ]]; then
+    args+=('--kaldi-dir' "${kaldi_dir}")
+fi
+
+if [[ ! -z "${model_type}" ]]; then
+    args+=('--model-type' "${model_type}")
+fi
+
+if [[ ! -z "${model_dir}" ]]; then
+    args+=('--model-dir' "${model_dir}")
+fi
+
+args+=("$@")
+
+# -----------------------------------------------------------------------------
+
+rhasspy-train "${args[@]}"

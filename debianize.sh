@@ -26,10 +26,17 @@ rsync -av --delete \
       "${output_dir}"
 
 # Remove all symbols (Liantian warning)
-strip --strip-all "${output_dir}"/*.so*
+strip --strip-all "${output_dir}"/*.so* || true
 
 # Remove executable bit from shared libs (Lintian warning)
-chmod -x "${output_dir}"/*.so*
+chmod -x "${output_dir}"/*.so* || true
+
+# Copy bin scripts
+bin_dir="${category}/${package_name}/bin"
+if [[ -d "${bin_dir}" ]]; then
+    mkdir -p "${output_dir}/usr/bin"
+    cp "${bin_dir}"/rhasspy-* "${output_dir}/usr/bin/"
+fi
 
 # Actually build the package
 cd "debian/${category}" && fakeroot dpkg --build "${package_name}"

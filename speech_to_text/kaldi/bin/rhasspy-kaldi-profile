@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -40,13 +39,12 @@ graph_dir="${FLAGS_graph_dir}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_dir="$(realpath "${profile_dir}")"
-    export profile_dir
-    source <(yq "${profile_dir}/profile.yml" \
-                -q kaldi_dir 'speech-to-text.kaldi.kaldi-directory' "${kaldi_dir}" \
-                -q model_dir 'speech-to-text.kaldi.model-directory' "${model_dir}" \
-                -q model_type 'speech-to-text.kaldi.model-type' "${model_type}" \
-                -q graph_dir 'speech-to-text.kaldi.graph-directory' "${graph_dir}" | \
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q kaldi_dir 'speech-to-text.kaldi.kaldi-directory' "${kaldi_dir}" \
+                        -q model_dir 'speech-to-text.kaldi.model-directory' "${model_dir}" \
+                        -q model_type 'speech-to-text.kaldi.model-type' "${model_type}" \
+                        -q graph_dir 'speech-to-text.kaldi.graph-directory' "${graph_dir}" | \
                  tee /dev/stderr)
 fi
 
@@ -102,4 +100,4 @@ args+=("$@")
 
 # -----------------------------------------------------------------------------
 
-python3 -m speech_to_text.kaldi "${args[@]}"
+rhasspy-kaldi "${args[@]}"

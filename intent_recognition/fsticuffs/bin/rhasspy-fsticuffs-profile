@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
 
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
-
-DEFINE_string 'http-host' '0.0.0.0' 'HTTP server address'
-DEFINE_integer 'http-port' 8000 'HTTP server port'
 
 # fsticuffs
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
@@ -28,12 +24,10 @@ eval set -- "${FLAGS_ARGV}"
 # -----------------------------------------------------------------------------
 # Default Settings
 # -----------------------------------------------------------------------------
+
 set -e
 
 profile_dir="${FLAGS_profile}"
-
-http_host="${FLAGS_http_host}"
-http_port="${FLAGS_http_port}"
 
 intent_fst="${FLAGS_intent_fst}"
 
@@ -54,13 +48,11 @@ fi
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    export profile_dir
-    source <(yq "${profile_dir}/profile.yml" \
-                -q http_host 'intent-recognition.fsticuffs.http-server.host' "${http_host}" \
-                -q http_port 'intent-recognition.fsticuffs.http-server.port' "${http_port}" \
-                -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
-                -q skip_unknown 'intent-recognition.fsticuffs.skip_unknown' "${skip_unknown}" \
-                -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" | \
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
+                        -q skip_unknown 'intent-recognition.fsticuffs.skip_unknown' "${skip_unknown}" \
+                        -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" | \
                  tee /dev/stderr)
 fi
 
@@ -82,23 +74,4 @@ fi
 
 args+=("$@")
 
-# -----------------------------------------------------------------------------
-# Events FIFO
-# -----------------------------------------------------------------------------
-
-events_fifo="$(mktemp -u)"
-
-function finish {
-    rm -f "${events_fifo}"
-}
-
-trap finish EXIT
-mkfifo "${events_fifo}"
-
-# -----------------------------------------------------------------------------
-
-python3 -m intent_recognition.fsticuffs.http_server  \
-        --host "${http_host}" --port "${http_port}" \
-        < "${events_fifo}" | \
-    fsticuffs "${args[@]}" | \
-    tee /dev/stderr > "${events_fifo}"
+rhasspy-fsticuffs "${args[@]}"
