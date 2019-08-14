@@ -1,0 +1,7 @@
+Package: rhasspy-en-us-pocketsphinx-cmu
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: U.S. English language files for Rhasspy voice assistant based on the Pocketsphinx CMU model

@@ -135,6 +135,12 @@ if [[ -z "$(which sox)" ]]; then
     install sox
 fi
 
+# supervisord
+if [[ -z "$(which supervisord)" ]]; then
+    echo "Installing supervisord"
+    install supervisor
+fi
+
 # subversion (needed by kaldi for some dumb reason)
 if [[ -z "$(which svn)" ]]; then
     echo "Installing subversion"

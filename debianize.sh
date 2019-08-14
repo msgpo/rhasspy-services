@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -e
+
 if [[ -z "$3" ]]; then
     echo "Usage: debianize.sh CATEGORY NAME ARCH [VERSION]"
     exit 1
@@ -16,6 +18,7 @@ fi
 package_name="rhasspy-${name}_${version}_${arch}"
 package_dir="debian/${category}/${package_name}"
 output_dir="${package_dir}/usr/lib/rhasspy/${name}"
+mkdir -p "${output_dir}"
 
 # Copy PyInstaller-generated files
 rsync -av --delete \

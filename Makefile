@@ -1,4 +1,5 @@
-.PHONY: debian-audio \
+.PHONY: debian-assistant-en-us \
+        debian-audio \
         debian-espeak \
         debian-fsticuffs \
         debian-kaldi \
@@ -93,8 +94,8 @@ installer-utils:
 # Debian
 # -----------------------------------------------------------------------------
 
-debian-assistant:
-	cd debian/assistnat && fakeroot dpkg --build rhasspy-assistant-en-us_1.0_$(FRIENDLY_ARCH)
+debian-assistant-en-us:
+	cd debian/assistant && fakeroot dpkg --build rhasspy-assistant-en-us_1.0_$(FRIENDLY_ARCH)
 
 debian-audio:
 	cd debian/audio && fakeroot dpkg --build rhasspy-pulseaudio_1.0_$(FRIENDLY_ARCH)
@@ -109,12 +110,15 @@ debian-kaldi: installer-kaldi
 	bash debianize.sh speech_to_text kaldi $(FRIENDLY_ARCH)
 
 debian-languages:
-	rsync -av --delete languages/english/en-us_pocketsphinx-cmu/ debian/languages/rhasspy-en-us-pocketsphinx-cmu_1.0_all/usr/lib/rhasspy/languages/english/en-us_pocketsphinx-cmu/
+	output_dir="debian/languages/rhasspy-en-us-pocketsphinx-cmu_1.0_all/usr/lib/rhasspy/languages/english/en-us_pocketsphinx-cmu/"; \
+    mkdir -p "$${output_dir}" && \
+    rsync -av --delete languages/english/en-us_pocketsphinx-cmu/ "$${output_dir}/"
 	cd debian/languages && fakeroot dpkg --build rhasspy-en-us-pocketsphinx-cmu_1.0_all
 
 debian-pocketsphinx: installer-pocketsphinx
-	rsync -av --delete dist/pocketsphinx-http/ \
-        debian/speech_to_text/rhasspy-pocketsphinx_1.0_$(FRIENDLY_ARCH)/usr/lib/rhasspy/pocketsphinx-http/
+	output_dir="debian/speech_to_text/rhasspy-pocketsphinx_1.0_$(FRIENDLY_ARCH)/usr/lib/rhasspy/pocketsphinx-http"; \
+    mkdir -p "$${output_dir}" && \
+    rsync -av --delete dist/pocketsphinx-http/ "$${output_dir}/"
 	bash debianize.sh speech_to_text pocketsphinx $(FRIENDLY_ARCH)
 
 debian-porcupine: installer-porcupine

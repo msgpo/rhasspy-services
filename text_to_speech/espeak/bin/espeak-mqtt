@@ -68,7 +68,7 @@ if [[ ! -z "${profile_dir}" ]]; then
                 -q voice 'text-to-speech.espeak.voice' "${voice}" | \
                  tee /dev/stderr)
 
-    if [[ -z "${cache_directory} "]]; then
+    if [[ -z "${cache_directory}" ]]; then
         cache_directory="${profile_dir}/tts_cache"
     fi
 fi

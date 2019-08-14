@@ -19,6 +19,7 @@ export PYTHONPATH="${this_dir}"
 
 # Gather all the bin paths
 rhasspy_paths=("${venv}/bin" "${this_dir}/bin")
+rhasspy_paths+=("${this_dir}/assistant/bin")
 rhasspy_paths+=("${this_dir}/audio_input/pulseaudio/bin")
 rhasspy_paths+=("${this_dir}/audio_output/pulseaudio/bin")
 rhasspy_paths+=("${this_dir}/intent_recognition/fsticuffs/bin")

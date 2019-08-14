@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+rhasspy_lang='en-us'
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# supervisord
+DEFINE_string 'supervisord-conf' '' 'Path to supervisord conf file'
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+supervisord_conf="${FLAGS_supervisord_conf}"
+
+if [[ -z "${supervisord_conf}" ]]; then
+    supervisord_conf="${rhasspy_dir}/assistant/${rhasspy_lang}.supervisord.conf"
+    echo "Using ${supervisord_conf}" > /dev/stderr
+fi
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ -z "${profile_dir}" ]]; then
+    if [[ -z "${XDG_CONFIG_HOME}" ]]; then
+        profile_dir="${HOME}/.config/rhasspy/${rhasspy_lang}"
+    else
+        profile_dir="${XDG_CONFIG_HOME}/rhasspy/${rhasspy_lang}"
+    fi
+fi
+
+export profile_dir="$(realpath "${profile_dir}")"
+echo "Profile at ${profile_dir}" > /dev/stderr
+
+# -----------------------------------------------------------------------------
+# Run assistant
+# -----------------------------------------------------------------------------
+
+supervisord -c "${supervisord_conf}"
