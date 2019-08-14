@@ -59,12 +59,16 @@ def wait_for_command(
     vad = webrtcvad.Vad()
     vad.set_mode(vad_mode)
 
+    report_audio = False
+
     # Pre-compute values
     seconds_per_buffer = chunk_size / sample_rate
     speech_buffers = int(math.ceil(speech_seconds / seconds_per_buffer))
 
     # Processes one voice command
     def read_audio(request_id=""):
+        nonlocal report_audio
+
         # State
         max_buffers = int(math.ceil(max_seconds / seconds_per_buffer))
         min_phrase_buffers = int(math.ceil(min_seconds / seconds_per_buffer))
@@ -85,6 +89,10 @@ def wait_for_command(
             chunk = audio_file.read(chunk_size)
             if len(chunk) < chunk_size:
                 break  # TODO: buffer instead of bailing
+
+            if report_audio:
+                logger.debug("Receiving audio")
+                report_audio = False
 
             buffer_count += 1
             current_seconds += seconds_per_buffer
@@ -165,10 +173,12 @@ def wait_for_command(
                     request_id = topic[len(event_start) :]
 
                     # Process voice command
-                    logger.debug("Started listening")
+                    logger.debug(f"Started listening (request_id={request_id})")
+                    report_audio = True
                     read_audio(request_id)
     else:
         # Process a voice command immediately
+        report_audio = True
         read_audio()
 
 

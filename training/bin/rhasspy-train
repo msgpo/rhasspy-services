@@ -73,6 +73,12 @@ fi
 
 # -----------------------------------------------------------------------------
 
+temp_dir="$(mktemp -d)"
+function cleanup {
+    rm -rf "${temp_dir}"
+}
+trap cleanup EXIT
+
 if [[ -z "${grammar_dir}" ]]; then
     grammar_dir="${temp_dir}/grammars"
 fi
@@ -90,6 +96,7 @@ fi
 # ini -> jsgf
 rhasspy-ini_jsgf \
     --grammar-dir "${grammar_dir}" \
+    "${debug}" \
     < "${sentences_ini}"
 
 # jsgf -> fst, arpa
@@ -104,6 +111,7 @@ rhasspy-jsgf_fst_arpa \
     --fst "${intent_fst}" \
     --arpa "${language_model}" \
     --vocab "${vocab}" \
+    "${debug}" \
     "${jsgf_fst_args[@]}"
 
 # vocab -> dict
@@ -112,6 +120,7 @@ rhasspy-vocab_dict \
     --vocab "${vocab}" \
     --dictionary "${base_dictionary}" \
     --unknown "${unknown}" \
+    "${debug}" \
     > "${dictionary}"
 
 # Check for unknown words
@@ -125,7 +134,8 @@ if [[ ! -f "${unknown}" ]]; then
             --model-type "${model_type}" \
             --model-dir "${model_dir}" \
             --dictionary "${dictionary}" \
-            --language-model "${language_model}"
+            --language-model "${language_model}" \
+            "${debug}"
     fi
 
     # Success
@@ -146,6 +156,7 @@ else
         rhasspy-vocab_g2p \
             --model "${g2p_model}" \
             --nbest "${nbest}" \
+            "${debug}" \
             < "${unknown}"
 
         echo 'Done guessing'

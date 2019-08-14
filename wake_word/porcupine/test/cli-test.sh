@@ -2,15 +2,15 @@
 set -e
 this_dir="$( cd "$( dirname "$0" )" && pwd )"
 
-true_positive="${this_dir}/test/porcupine.raw"
-true_negative="${this_dir}/test/what_time_is_it.raw"
+true_positive="${this_dir}/porcupine.raw"
+true_negative="${this_dir}/what_time_is_it.raw"
 
 function porcupine_test {
     cat "$1" | \
-        porcupine \
-            --library "${this_dir}/lib/x86_64/libpv_porcupine.so" \
-            --model "${this_dir}/lib/common/porcupine_params.pv" \
-            --keyword "${this_dir}/resources/keyword_files/linux/porcupine_linux.ppn"
+        rhasspy-porcupine \
+            --library "${this_dir}/../lib/x86_64/libpv_porcupine.so" \
+            --model "${this_dir}/../lib/common/porcupine_params.pv" \
+            --keyword "${this_dir}/../resources/keyword_files/linux/porcupine_linux.ppn"
 }
 
 export porcupine_test

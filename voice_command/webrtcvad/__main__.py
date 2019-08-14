@@ -50,9 +50,9 @@ def main():
     )
     parser.add_argument(
         "--speech-seconds",
-        help="Seconds of speech before voice command is considered started (default=0.3)",
+        help="Seconds of speech before voice command is considered started (default=0.5)",
         type=float,
-        default=0.3,
+        default=0.5,
     )
     parser.add_argument(
         "--silence-seconds",

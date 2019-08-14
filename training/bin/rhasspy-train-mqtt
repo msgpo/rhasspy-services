@@ -87,24 +87,24 @@ if [[ ! -z "${profile_dir}" ]]; then
     profile_dir="$(realpath "${profile_dir}")"
     export profile_dir
 
-    source <(yq "${profile_dir}/profile.yml" \
-                -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-                -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                -q sentences_ini 'training.sentences-file' "${sentences_ini}" \
-                -q g2p_model 'training.grapheme-to-phoneme-model' "${g2p_model}" \
-                -q intent_fst 'training.intent-fst' "${intent_fst}" \
-                -q language_model 'training.language-model' "${language_model}" \
-                -q dictionary 'training.dictionary' "${dictionary}" \
-                -q base_dictionary 'training.base-dictionary' "${base_dictionary}" \
-                -q grammar_dir 'training.grammar-directory' "${grammar_dir}" \
-                -q slots_dir 'training.slots-directory' "${slots_dir}" \
-                -q vocab 'training.vocabulary-file' "${vocab}" \
-                -q unknown 'training.unknown-words-file' "${unknown}" \
-                -q model_type 'training.kaldi.model-type' "${model_type}" \
-                -q model_dir 'training.kaldi.model-directory' "${model_dir}" \
-                -q start_training 'training.mqtt-events.start-training' "${start_training}" \
-                -q training_failed 'training.mqtt-events.training-failed' "${training_failed}" \
-                -q training_complete 'training.mqtt-events.training-complete' "${training_complete}" | \
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q sentences_ini 'training.sentences-file' "${sentences_ini}" \
+                        -q g2p_model 'training.grapheme-to-phoneme-model' "${g2p_model}" \
+                        -q intent_fst 'training.intent-fst' "${intent_fst}" \
+                        -q language_model 'training.language-model' "${language_model}" \
+                        -q dictionary 'training.dictionary' "${dictionary}" \
+                        -q base_dictionary 'training.base-dictionary' "${base_dictionary}" \
+                        -q grammar_dir 'training.grammar-directory' "${grammar_dir}" \
+                        -q slots_dir 'training.slots-directory' "${slots_dir}" \
+                        -q vocab 'training.vocabulary-file' "${vocab}" \
+                        -q unknown 'training.unknown-words-file' "${unknown}" \
+                        -q model_type 'training.kaldi.model-type' "${model_type}" \
+                        -q model_dir 'training.kaldi.model-directory' "${model_dir}" \
+                        -q start_training 'training.mqtt-events.start-training' "${start_training}" \
+                        -q training_failed 'training.mqtt-events.training-failed' "${training_failed}" \
+                        -q training_complete 'training.mqtt-events.training-complete' "${training_complete}" | \
                  tee /dev/stderr)
 fi
 
@@ -166,13 +166,13 @@ do
 
     (
         # ini -> jsgf
-        ini_jsgf \
+        rhasspy-ini_jsgf \
             --grammar-dir "${grammar_dir}" \
             < "${sentences_ini}" \
             2> "${error_file}" || exit 1
 
         # jsgf -> fst, arpa
-        jsgf_fst_arpa \
+        rhasspy-jsgf_fst_arpa \
             --grammar-dir "${grammar_dir}" \
             --fst "${intent_fst}" \
             --arpa "${language_model}" \
@@ -182,7 +182,7 @@ do
 
         # vocab -> dict
         rm -f "${unknown}"
-        vocab_dict \
+        rhasspy-vocab_dict \
             --vocab "${vocab}" \
             --dictionary "${base_dictionary}" \
             --unknown "${unknown}" \
@@ -195,7 +195,7 @@ do
             # Check if Kaldi model training is required
             if [[ ! -z "${model_type}" ]]; then
                 echo "Training kaldi model"
-                kaldi-train \
+                rhasspy-kaldi-train \
                     --kaldi-dir "${kaldi_dir}" \
                     --model-type "${model_type}" \
                     --model-dir "${model_dir}" \
@@ -221,7 +221,7 @@ do
                 echo "Guessing unknown word pronunciations with ${g2p_model}"
 
                 echo '{ "error": "unknown words", "unknown_words": [' > "${guess}"
-                vocab_g2p \
+                rhasspy-vocab_g2p \
                     --model "${g2p_model}" \
                     --nbest "${nbest}" \
                     < "${unknown}" >> "${guess}"

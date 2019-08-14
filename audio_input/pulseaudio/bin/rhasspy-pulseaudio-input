@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -33,10 +32,10 @@ cli_clients="${FLAGS_clients}"
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    export profile_dir
-    source <(yq "${profile_dir}/profile.yml" \
-                -q clients 'audio-input.pulseaudio.clients' '' | \
-            tee /dev/stderr)
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q clients 'audio-input.pulseaudio.clients' '' | \
+                 tee /dev/stderr)
 fi
 
 # -----------------------------------------------------------------------------

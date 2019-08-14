@@ -55,6 +55,11 @@ def main():
         default="stop",
     )
     parser.add_argument(
+        "--event-detected",
+        help="Topic to publish when wake word is detected (default=detected)",
+        default="detected",
+    )
+    parser.add_argument(
         "--auto-start", action="store_true", help="Start listening immediately"
     )
     parser.add_argument(

@@ -51,7 +51,7 @@ if [[ ! -z "${profile_dir}" ]]; then
     export profile_dir="$(realpath "${profile_dir}")"
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
-                        -q skip_unknown 'intent-recognition.fsticuffs.skip_unknown' "${skip_unknown}" \
+                        -q skip_unknown 'intent-recognition.fsticuffs.skip-unknown' "${skip_unknown}" \
                         -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" | \
                  tee /dev/stderr)
 fi

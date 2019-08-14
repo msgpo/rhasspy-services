@@ -57,7 +57,7 @@ fi
 # Disable automatic exit on error
 set +e
 
-jsonl_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${play_uri}/#" | \
+rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${play_uri}/#" | \
     while read -r topic json;
     do
         uri="$(echo -n "${json}" | jq '.uri')"

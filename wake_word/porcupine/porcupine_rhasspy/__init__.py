@@ -27,6 +27,7 @@ def wait_for_wake_word(
     sensitivity: List[float] = [],
     event_start: str = "start",
     event_stop: str = "start",
+    event_detected: str = "detected",
     auto_start: bool = False,
     debug: bool = False,
 ):
@@ -56,17 +57,24 @@ def wait_for_wake_word(
         f"Expecting sample rate={handle.sample_rate}, frame length={handle.frame_length}"
     )
 
+    request_id = ""
+    report_audio = False
+
     if events_file or auto_start:
         listening = False
 
         # Read thread
         def read_audio():
-            nonlocal listening, handle
+            nonlocal listening, handle, report_audio
             try:
                 while True:
                     chunk = audio_file.read(chunk_size)
                     if len(chunk) > 0:
                         if listening:
+                            if report_audio:
+                                logger.debug("Receiving audio")
+                                report_audio = False
+
                             # Process audio chunk
                             chunk = struct.unpack_from(chunk_format, chunk)
                             keyword_index = handle.process(chunk)
@@ -81,6 +89,7 @@ def wait_for_wake_word(
                                     "keyword": keyword[keyword_index],
                                 }
 
+                                print(event_detected + request_id, end=" ")
                                 with jsonlines.Writer(sys.stdout) as out:
                                     out.write(result)
 
@@ -95,6 +104,7 @@ def wait_for_wake_word(
         if auto_start:
             logging.debug("Automatically started listening")
             listening = True
+            report_audio = True
 
         if events_file:
             # Wait for start/stop events
@@ -106,14 +116,21 @@ def wait_for_wake_word(
 
                     logging.debug(line)
                     topic, event = line.split(" ", maxsplit=1)
-                    if topic == event_start:
+                    if topic.startswith(event_start):
+                        # Everything after expected topic is request id
+                        request_id = topic[len(event_start) :]
+
                         # Clear buffer and start reading
                         listening = True
-                        logging.debug("Started listening")
-                    elif topic == event_stop:
+                        report_audio = True
+                        logging.debug(f"Started listening (request_id={request_id})")
+                    elif topic.startswith(event_stop):
+                        # Everything after expected topic is request id
+                        request_id = topic[len(event_start) :]
+
                         # Stop reading and transcribe
                         listening = False
-                        logging.debug("Stopped listening")
+                        logging.debug(f"Stopped listening (request_id={request_id})")
 
         else:
             # Wait forever
@@ -138,6 +155,7 @@ def wait_for_wake_word(
                     logging.debug(f"Keyword {keyword_index} detected")
                     result = {"index": keyword_index, "keyword": keyword[keyword_index]}
 
+                    print(event_detected + request_id, end=" ")
                     with jsonlines.Writer(sys.stdout) as out:
                         out.write(result)
 

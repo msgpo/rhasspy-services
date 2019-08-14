@@ -5,6 +5,9 @@ if [[ -z "${rhasspy_dir}" ]]; then
     export rhasspy_dir='/usr/lib/rhasspy'
 fi
 
+lang_full="${rhasspy_lang}_pocketsphinx-cmu"
+lang_dir="${rhasspy_dir}/languages/english/${lang_full}"
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
@@ -37,17 +40,43 @@ fi
 
 if [[ -z "${profile_dir}" ]]; then
     if [[ -z "${XDG_CONFIG_HOME}" ]]; then
-        profile_dir="${HOME}/.config/rhasspy/${rhasspy_lang}"
+        profile_dir="${HOME}/.config/rhasspy/${lang_full}"
     else
-        profile_dir="${XDG_CONFIG_HOME}/rhasspy/${rhasspy_lang}"
+        profile_dir="${XDG_CONFIG_HOME}/rhasspy/${lang_full}"
     fi
 fi
 
 export profile_dir="$(realpath "${profile_dir}")"
 echo "Profile at ${profile_dir}" > /dev/stderr
+mkdir -p "${profile_dir}"
+
+# -----------------------------------------------------------------------------
+# Copy required files
+# -----------------------------------------------------------------------------
+
+if [[ ! -f "${profile_dir}/profile.yml" ]]; then
+    cp "${lang_dir}/profile.example.yml" "${profile_dir}/profile.yml"
+    echo "Using example profile.yml" > /dev/stderr
+fi
+
+if [[ ! -f "${profile_dir}/sentences.ini" ]]; then
+    cp "${lang_dir}/sentences.example.ini" "${profile_dir}/sentences.ini"
+    echo "Using example sentences. Training is required." > /dev/stderr
+fi
+
+# -----------------------------------------------------------------------------
+# Train
+# -----------------------------------------------------------------------------
+
+echo "Training..." > /dev/stderr
+rhasspy-train-profile --profile "${profile_dir}" --debug
 
 # -----------------------------------------------------------------------------
 # Run assistant
 # -----------------------------------------------------------------------------
+
+export log_dir="${profile_dir}/logs"
+rm -rf "${log_dir}"
+mkdir -p "${log_dir}"
 
 supervisord -c "${supervisord_conf}"

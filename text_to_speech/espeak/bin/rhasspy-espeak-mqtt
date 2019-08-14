@@ -21,8 +21,8 @@ DEFINE_string 'say-text' 'rhasspy/text-to-speech/say-text' 'Topic for text to sp
 DEFINE_string 'play-uri' 'rhasspy/audio-output/play-uri' 'Topic for uri audio output'
 
 # Cache
-DEFINE_string 'base-uri' 'http://localhost:8000' 'Base uri for play requests'
-DEFINE_string 'cache-directory' 'cache' 'Directory to cache WAV files'
+DEFINE_string 'base-uri' '' 'Base uri for play requests'
+DEFINE_string 'cache-directory' '' 'Directory to cache WAV files'
 
 # espeak
 DEFINE_string 'voice' '' 'espeak voice'
@@ -82,11 +82,15 @@ fi
 args+=("$@")
 
 if [[ -z "${cache_directory}" ]]; then
-    cache_directory="$(pwd)/tts_cache"
+    cache_directory="${profile_dir}/tts_cache"
 fi
 
 # Create cache dir
 mkdir -p "${cache_directory}"
+
+if [[ -z "${base_uri}" ]]; then
+    base_uri="file://${cache_directory}"
+fi
 
 # -----------------------------------------------------------------------------
 

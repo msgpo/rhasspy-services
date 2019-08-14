@@ -137,15 +137,21 @@ def main():
         # Lock for audio_data
         audio_data_lock = threading.Lock()
 
+        report_audio = False
+
         # Read thread (asynchronous)
         if not args.audio_file_lines:
 
             def read_audio():
-                nonlocal audio_data, audio_data_lock
+                nonlocal audio_data, audio_data_lock, report_audio
                 try:
                     while True:
                         chunk = audio_file.read(args.chunk_size)
                         if len(chunk) > 0:
+                            if report_audio:
+                                logger.debug("Receiving audio")
+                                report_audio = False
+
                             with audio_data_lock:
                                 # Add to all active buffers
                                 for key in audio_data:
@@ -185,6 +191,7 @@ def main():
                         audio_data[request_id] = bytes()
 
                     logger.debug(f"Started listening (request_id={request_id})")
+                    report_audio = True
 
             elif topic.startswith(args.event_stop):
                 # Everything after expected topic is response id
