@@ -64,7 +64,7 @@ def wait_for_command(
     speech_buffers = int(math.ceil(speech_seconds / seconds_per_buffer))
 
     # Processes one voice command
-    def read_audio():
+    def read_audio(request_id=""):
         # State
         max_buffers = int(math.ceil(max_seconds / seconds_per_buffer))
         min_phrase_buffers = int(math.ceil(min_seconds / seconds_per_buffer))
@@ -93,18 +93,20 @@ def wait_for_command(
             max_buffers -= 1
             if max_buffers <= 0:
                 # Timeout
-                logging.warn("Timeout")
-                send_event(event_command_timeout, {"seconds": current_seconds})
+                logger.warn("Timeout")
+                send_event(
+                    event_command_timeout + request_id, {"seconds": current_seconds}
+                )
                 break
 
             # Detect speech in chunk
             is_speech = vad.is_speech(chunk, sample_rate)
             if is_speech and not last_speech:
                 # Silence -> speech
-                send_event(event_speech, {"seconds": current_seconds})
+                send_event(event_speech + request_id, {"seconds": current_seconds})
             elif not is_speech and last_speech:
                 # Speech -> silence
-                send_event(event_silence, {"seconds": current_seconds})
+                send_event(event_silence + request_id, {"seconds": current_seconds})
 
             last_speech = is_speech
 
@@ -113,8 +115,10 @@ def wait_for_command(
                 speech_buffers_left -= 1
             elif is_speech and not in_phrase:
                 # Start of phrase
-                logging.debug("Voice command started")
-                send_event(event_command_start, {"seconds": current_seconds})
+                logger.debug("Voice command started")
+                send_event(
+                    event_command_start + request_id, {"seconds": current_seconds}
+                )
 
                 in_phrase = True
                 after_phrase = False
@@ -132,8 +136,10 @@ def wait_for_command(
                     silence_buffers -= 1
                 elif after_phrase and (silence_buffers <= 0):
                     # Phrase complete
-                    logging.debug("Voice command finished")
-                    send_event(event_command_stop, {"seconds": current_seconds})
+                    logger.debug("Voice command finished")
+                    send_event(
+                        event_command_stop + request_id, {"seconds": current_seconds}
+                    )
                     break
                 elif in_phrase and (min_phrase_buffers <= 0):
                     # Transition to after phrase
@@ -152,12 +158,15 @@ def wait_for_command(
                 if len(line) == 0:
                     continue
 
-                logging.debug(line)
+                logger.debug(line)
                 topic, event = line.split(" ", maxsplit=1)
-                if topic == event_start:
+                if topic.startswith(event_start):
+                    # Everything after expected topic is request id
+                    request_id = topic[len(event_start) :]
+
                     # Process voice command
-                    logging.debug("Started listening")
-                    read_audio()
+                    logger.debug("Started listening")
+                    read_audio(request_id)
     else:
         # Process a voice command immediately
         read_audio()

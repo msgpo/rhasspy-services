@@ -85,38 +85,43 @@ ARG PY_DIR=training
 COPY ${PY_DIR}/requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
-COPY bin/yq /usr/bin/
-COPY etc/shflags /etc/
+COPY bin/rhasspy-yq /usr/bin/
+COPY etc/shflags /usr/lib/rhasspy/etc/
 
 # ini_jsgf
-COPY ${PY_DIR}/ini_jsgf/__init__.py ${PY_DIR}/ini_jsgf/__main__.py  /rhasspy/${PY_DIR}/ini_jsgf/
-COPY ${PY_DIR}/ini_jsgf/ini_jsgf  /rhasspy/${PY_DIR}/ini_jsgf/ini_jsgf/
-COPY ${PY_DIR}/ini_jsgf/bin/ini_jsgf  /usr/bin/
+COPY ${PY_DIR}/ini_jsgf/__init__.py ${PY_DIR}/ini_jsgf/__main__.py \
+     /usr/lib/rhasspy/${PY_DIR}/ini_jsgf/
+
+COPY ${PY_DIR}/ini_jsgf/ini_jsgf /usr/lib/rhasspy/${PY_DIR}/ini_jsgf/ini_jsgf/
+COPY ${PY_DIR}/ini_jsgf/bin/rhasspy-ini_jsgf /usr/bin/
 
 # jsgf_fst_arpa
-COPY ${PY_DIR}/jsgf_fst_arpa/__init__.py ${PY_DIR}/jsgf_fst_arpa/__main__.py  /rhasspy/${PY_DIR}/jsgf_fst_arpa/
-COPY ${PY_DIR}/jsgf_fst_arpa/jsgf_fst_arpa  /rhasspy/${PY_DIR}/jsgf_fst_arpa/jsgf_fst_arpa/
-COPY ${PY_DIR}/jsgf_fst_arpa/bin/jsgf_fst_arpa  /usr/bin/
+COPY ${PY_DIR}/jsgf_fst_arpa/__init__.py ${PY_DIR}/jsgf_fst_arpa/__main__.py \
+     /usr/lib/rhasspy/${PY_DIR}/jsgf_fst_arpa/
+
+COPY ${PY_DIR}/jsgf_fst_arpa/jsgf_fst_arpa /usr/lib/rhasspy/${PY_DIR}/jsgf_fst_arpa/jsgf_fst_arpa/
+COPY ${PY_DIR}/jsgf_fst_arpa/bin/rhasspy-jsgf_fst_arpa /usr/bin/
 
 # vocab_dict
-COPY ${PY_DIR}/vocab_dict/__init__.py ${PY_DIR}/vocab_dict/__main__.py  /rhasspy/${PY_DIR}/vocab_dict/
-COPY ${PY_DIR}/vocab_dict/vocab_dict  /rhasspy/${PY_DIR}/vocab_dict/vocab_dict/
-COPY ${PY_DIR}/vocab_dict/bin/vocab_dict  /usr/bin/
+COPY ${PY_DIR}/vocab_dict/__init__.py ${PY_DIR}/vocab_dict/__main__.py \
+     /usr/lib/rhasspy/${PY_DIR}/vocab_dict/
+
+COPY ${PY_DIR}/vocab_dict/vocab_dict /usr/lib/rhasspy/${PY_DIR}/vocab_dict/vocab_dict/
+COPY ${PY_DIR}/vocab_dict/bin/rhasspy-vocab_dict /usr/bin/
 
 # vocab_g2p
-COPY ${PY_DIR}/vocab_g2p/__init__.py ${PY_DIR}/vocab_g2p/__main__.py  /rhasspy/${PY_DIR}/vocab_g2p/
-COPY ${PY_DIR}/vocab_g2p/bin/vocab_g2p  /usr/bin/
+COPY ${PY_DIR}/vocab_g2p/__init__.py ${PY_DIR}/vocab_g2p/__main__.py \
+     /usr/lib/rhasspy/${PY_DIR}/vocab_g2p/
+
+COPY ${PY_DIR}/vocab_g2p/bin/rhasspy-vocab_g2p  /usr/bin/
 
 # train
-COPY ${PY_DIR}/__init__.py ${PY_DIR}/__main__.py /rhasspy/${PY_DIR}/
-COPY ${PY_DIR}/bin/train  /usr/bin/
-COPY ${PY_DIR}/bin/train-mqtt  /usr/bin/
+COPY ${PY_DIR}/__init__.py ${PY_DIR}/__main__.py /usr/lib/rhasspy/${PY_DIR}/
+COPY ${PY_DIR}/bin/rhasspy-*  /usr/bin/
 
 # pronounce
 COPY text_to_speech/espeak/bin/espeak_pronounce /usr/bin/
 
-ENV shflags=/etc/shflags
-ENV PYTHONPATH=/rhasspy
+ENV PYTHONPATH=/usr/lib/rhasspy
 
-WORKDIR /rhasspy
 ENTRYPOINT ["bash"]

@@ -13,11 +13,9 @@ ARG PY_DIR=text_to_speech/espeak
 COPY ${PY_DIR}/requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
-COPY bin/yq bin/jsonl bin/jsonl_sub /usr/bin/
-COPY etc/shflags /etc/
-COPY ${PY_DIR}/bin/espeak-mqtt /
+COPY bin/rhasspy-yq bin/rhasspy-jsonl-sub /usr/bin/
+COPY etc/shflags /usr/lib/rhasspy/etc/
 
-ENV shflags=/etc/shflags
+COPY ${PY_DIR}/bin/rhasspy-* /usr/bin/
 
-WORKDIR /
-ENTRYPOINT ["bash", "/espeak-mqtt"]
+ENTRYPOINT ["bash"]

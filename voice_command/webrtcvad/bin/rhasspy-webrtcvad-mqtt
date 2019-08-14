@@ -91,7 +91,7 @@ fi
 nc -ukl "${audio_host}" "${audio_port}" | \
     rhasspy-webrtcvad \
         "${args[@]}" \
-        --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}") \
+        --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}/#") \
         --event-start "${start_listening}" \
         --event-command-start "${command_started}" \
         --event-command-stop "${command_stopped}" \

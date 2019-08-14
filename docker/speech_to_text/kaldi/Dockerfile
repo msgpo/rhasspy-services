@@ -59,17 +59,13 @@ ENV PY_DIR=speech_to_text/kaldi
 COPY ${PY_DIR}/requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
-COPY bin/yq /usr/bin/
-COPY etc/shflags /etc/
+COPY bin/rhasspy-yq /usr/bin/
+COPY etc/shflags /usr/lib/rhasspy/etc/
 
-COPY ${PY_DIR}/__main__.py /rhasspy/${PY_DIR}/
-COPY ${PY_DIR}/bin/kaldi /usr/bin/
-COPY ${PY_DIR}/bin/kaldi-decode /usr/bin/
-COPY training/bin/kaldi-train /usr/bin/
+COPY ${PY_DIR}/__main__.py /usr/lib/rhasspy/${PY_DIR}/
+COPY ${PY_DIR}/bin/rhasspy-* training/bin/rhasspy-kaldi-train /usr/bin/
 
-ENV shflags=/etc/shflags
-ENV PYTHONPATH=/rhasspy
+ENV PYTHONPATH=/usr/lib/rhasspy
 ENV kaldi_dir=/kaldi
 
-WORKDIR /rhasspy
 ENTRYPOINT ["bash"]

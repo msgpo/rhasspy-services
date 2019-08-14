@@ -15,8 +15,8 @@ ARG PY_DIR=audio_input/pulseaudio
 COPY ${PY_DIR}/requirements.txt /
 RUN python3 -m pip install --no-cache-dir -r /requirements.txt
 
-COPY bin/yq /usr/bin/
-COPY etc/shflags /etc/
+COPY bin/rhasspy-yq /usr/bin/
+COPY etc/shflags /usr/lib/rhasspy/etc/
 
 # Create new user
 ENV UNAME=rhasspy
@@ -32,7 +32,7 @@ RUN export UNAME=$UNAME UID=1000 GID=1000 && \
 COPY docker/audio_input/pulseaudio/pulseaudio.client.conf /etc/pulse/client.conf
 
 # Copy script to run
-COPY ${PY_DIR}/bin/pulseaudio-input /home/${UNAME}/
+COPY ${PY_DIR}/bin/rhasspy-* /home/${UNAME}/
 
 # Create cookie dir
 RUN mkdir -p /home/${UNAME}/.config/pulse
@@ -44,7 +44,6 @@ RUN export UNAME=$UNAME UID=1000 GID=1000 && \
 # Switch to new user
 USER $UNAME
 ENV HOME /home/${UNAME}
-ENV shflags=/etc/shflags
 
 WORKDIR /home/${UNAME}
-ENTRYPOINT ["bash", "pulseaudio-input"]
+ENTRYPOINT ["bash"]
