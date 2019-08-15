@@ -25,12 +25,13 @@ EVENT_START = EVENT_PREFIX + "start-listening"
 
 # Output
 EVENT_ERROR = EVENT_PREFIX + "error"
+EVENT_STARTED = EVENT_PREFIX + "listening-started"
 EVENT_SPEECH = EVENT_PREFIX + "speech"
 EVENT_SILENCE = EVENT_PREFIX + "silence"
-EVENT_STARTED = EVENT_PREFIX + "command-started"
-EVENT_STOPPED = EVENT_PREFIX + "command-stopped"
-EVENT_TIMEOUT = EVENT_PREFIX + "command-timeout"
-EVENT_RECEIVNG_AUDIO = EVENT_PREFIX + "receiving-audio"
+EVENT_COMMAND_STARTED = EVENT_PREFIX + "command-started"
+EVENT_COMMAND_STOPPED = EVENT_PREFIX + "command-stopped"
+EVENT_COMMAND_TIMEOUT = EVENT_PREFIX + "command-timeout"
+EVENT_RECEIVING_AUDIO = EVENT_PREFIX + "receiving-audio"
 
 # -----------------------------------------------------------------------------
 
@@ -107,7 +108,9 @@ def wait_for_command(
             if max_buffers <= 0:
                 # Timeout
                 logger.warn("Timeout")
-                send_event(EVENT_TIMEOUT + request_id, {"seconds": current_seconds})
+                send_event(
+                    EVENT_COMMAND_TIMEOUT + request_id, {"seconds": current_seconds}
+                )
                 break
 
             # Detect speech in chunk
@@ -127,7 +130,9 @@ def wait_for_command(
             elif is_speech and not in_phrase:
                 # Start of phrase
                 logger.debug("Voice command started")
-                send_event(EVENT_STARTED + request_id, {"seconds": current_seconds})
+                send_event(
+                    EVENT_COMMAND_STARTED + request_id, {"seconds": current_seconds}
+                )
 
                 in_phrase = True
                 after_phrase = False
@@ -146,7 +151,9 @@ def wait_for_command(
                 elif after_phrase and (silence_buffers <= 0):
                     # Phrase complete
                     logger.debug("Voice command finished")
-                    send_event(EVENT_STOPPED + request_id, {"seconds": current_seconds})
+                    send_event(
+                        EVENT_COMMAND_STOPPED + request_id, {"seconds": current_seconds}
+                    )
                     break
                 elif in_phrase and (min_phrase_buffers <= 0):
                     # Transition to after phrase
@@ -165,7 +172,7 @@ def wait_for_command(
                 if len(chunk) == chunk_size:
                     if report_audio:
                         logger.debug("Receiving audio")
-                        send_event(EVENT_RECEIVNG_AUDIO + request_id)
+                        send_event(EVENT_RECEIVING_AUDIO + request_id)
                         report_audio = False
 
                     audio_chunks.put(chunk)
@@ -208,6 +215,7 @@ def wait_for_command(
                     logger.debug(f"Started listening (request_id={request_id})")
                     report_audio = True
                     process_audio(request_id)
+                    send_event(EVENT_STARTED + request_id, maybe_object(event))
             except Exception as e:
                 logger.exception(line)
                 send_event(EVENT_ERROR + request_id, {"error": str(e)})

@@ -15,10 +15,7 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 # MQTT
 DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
-
-# Events
-DEFINE_string 'play-uri' 'rhasspy/audio-output/play-uri' 'Topic to receive uri play requests'
-DEFINE_string 'uri-played' 'rhasspy/audio-output/uri-played' 'Topic to send after uri is played'
+DEFINE_string 'mqtt-topic' 'rhasspy/audio-output/#' 'MQTT topic to subscribe to'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -33,9 +30,7 @@ profile_dir="${FLAGS_profile}"
 
 mqtt_host="${FLAGS_mqtt_host}"
 mqtt_port="${FLAGS_mqtt_port}"
-
-play_uri="${FLAGS_play_uri}"
-uri_played="${FLAGS_uri_played}"
+mqtt_topic="${FLAGS_mqtt_topic}"
 
 # -----------------------------------------------------------------------------
 # Profile
@@ -46,33 +41,58 @@ if [[ ! -z "${profile_dir}" ]]; then
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                         -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                        -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
-                        -q uri_played 'audio-output.mqtt-events.uri-played' "${uri_played}" | \
+                        -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" | \
                  tee /dev/stderr)
 fi
+
+# -----------------------------------------------------------------------------
+# MQTT Events
+# -----------------------------------------------------------------------------
+
+event_prefix='rhasspy/audio-output'
+
+# Input
+event_play="${event_prefix}/play-uri"
+
+# Output
+event_played="${event_prefix}/uri-played"
 
 # -----------------------------------------------------------------------------
 
 # Disable automatic exit on error
 set +e
 
-rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${play_uri}/#" | \
+rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}" | \
     while read -r topic json;
     do
-        uri="$(echo -n "${json}" | jq '.uri')"
+        # Split topic by /
+        IFS='/'
+        read -ra topic_parts <<< "${topic}"
+        base_topic="${topic_parts[*]:0:3}"
+        request_id="${topic_parts[*]:3}"
 
-        if [[ ! -z "${uri}" ]]; then
-            echo "${uri}"
+        # Need to restore this
+        IFS=' '
 
-            # Play URI through speakers
-            gst-launch-1.0 \
-                uridecodebin uri="${uri}" ! \
-                pulsesink
+        if [[ ! -z "${request_id}" ]]; then
+            request_id="/${request_id}"
+        fi
 
-            # Use end of topic as response id
-            request_id="$(echo "${topic}" | sed -e "s|^${play_uri}||")"
+        if [[ "${base_topic}" == "${event_play}" ]]; then
+            # Extract URI
+            uri="$(echo -n "${json}" | jq '.uri')"
+
+            if [[ ! -z "${uri}" ]]; then
+                echo "${uri}"
+
+                # Play URI through speakers
+                gst-launch-1.0 -q \
+                               uridecodebin uri="${uri}" ! \
+                               pulsesink
+            fi
 
             # Report that playback is complete
-            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${uri_played}${request_id}" -m '{}'
+            mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" \
+                          -t "${event_played}${request_id}" -m "${json}"
         fi
     done

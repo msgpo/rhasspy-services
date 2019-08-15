@@ -15,10 +15,7 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 # MQTT
 DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
-
-# Events
-DEFINE_string 'say-text' 'rhasspy/text-to-speech/say-text' 'Topic for text to speech request'
-DEFINE_string 'play-uri' 'rhasspy/audio-output/play-uri' 'Topic for uri audio output'
+DEFINE_string 'mqtt-topic' 'rhasspy/text-to-speech/#' 'MQTT topic to subscribe to'
 
 # Cache
 DEFINE_string 'base-uri' '' 'Base uri for play requests'
@@ -40,9 +37,7 @@ profile_dir="${FLAGS_profile}"
 
 mqtt_host="${FLAGS_mqtt_host}"
 mqtt_port="${FLAGS_mqtt_port}"
-
-say_text="${FLAGS_say_text}"
-play_uri="${FLAGS_play_uri}"
+mqtt_topic="${FLAGS_mqtt_topic}"
 
 base_uri="${FLAGS_base_uri}"
 cache_directory="${FLAGS_cache_directory}"
@@ -58,15 +53,13 @@ if [[ ! -z "${profile_dir}" ]]; then
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                         -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                        -q say_text 'text-to-speech.mqtt-events.say-text' "${say_text}" \
-                        -q voice 'text-to-speech.espeak.voice' "${voice}" \
-                        -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
-                        -q base_uri 'text-to-speech.cache.base-uri' "${base_uri}" \
+                        -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
                         -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
                         -q voice 'text-to-speech.espeak.voice' "${voice}" | \
                  tee /dev/stderr)
 
     if [[ -z "${cache_directory}" ]]; then
+        # Default to profile directory for cache
         cache_directory="${profile_dir}/tts_cache"
     fi
 fi
@@ -89,30 +82,74 @@ fi
 mkdir -p "${cache_directory}"
 
 if [[ -z "${base_uri}" ]]; then
+    # Assume file-based access to cache
     base_uri="file://${cache_directory}"
 fi
+
+# -----------------------------------------------------------------------------
+# MQTT Events
+# -----------------------------------------------------------------------------
+
+event_prefix='rhasspy/text-to-speech'
+
+# Input
+event_say="${event_prefix}/say-text"
+
+# Output
+event_said="${event_prefix}/text-said"
+
+# Other
+event_play='rhasspy/audio-output/play-uri'
+
+function send_event {
+    topic="$1"
+    payload="$2"
+    if [[ -z "${payload}" ]]; then
+        payload='{}'
+    elif [[ "${payload}" == '-' ]]; then
+        payload="$(cat)"
+    fi
+
+    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"
+}
 
 # -----------------------------------------------------------------------------
 
 # Disable automatic exit on error
 set +e
 
-rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${say_text}/#" | \
+rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}" | \
     while read -r topic json;
     do
-        text="$(echo "${json}" | jq '.text')"
-        if [[ ! -z "${text}" ]]; then
-            echo "${text}"
+        # Split topic by /
+        IFS='/'
+        read -ra topic_parts <<< "${topic}"
+        base_topic="${topic_parts[*]:0:3}"
+        request_id="${topic_parts[*]:3}"
 
-            # Cache WAV file
-            filename="$(echo "${text}" | md5sum | awk '{ print $1 }').wav"
-            espeak-ng --stdout "${args[@]}" "${text}" > "${cache_directory}/${filename}"
+        # Need to restore this
+        IFS=' '
 
-            # Use end of topic as response id
-            request_id="$(echo "${topic}" | sed -e "s|^${say_text}||")"
+        if [[ ! -z "${request_id}" ]]; then
+            request_id="/${request_id}"
+        fi
 
-            # Request playback
-            jq -jc -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
-                mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${play_uri}${request_id}" -s
+        if [[ "${base_topic}" == "${event_say}" ]]; then
+            text="$(echo -n "${json}" | jq '.text')"
+            if [[ ! -z "${text}" ]]; then
+                echo "${text}"
+
+                # Cache WAV file
+                filename="$(echo "${voice}-${text}" | md5sum | awk '{ print $1 }').wav"
+                espeak-ng --stdout "${args[@]}" "${text}" \
+                          > "${cache_directory}/${filename}"
+
+                # Request playback
+                jq -jc -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
+                    send_event "${event_play}${request_id}" '-'
+            fi
+
+            # Report that text was said
+            send_event "${event_said}${request_id}" "${json}"
         fi
     done

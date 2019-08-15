@@ -23,13 +23,15 @@ EVENT_PREFIX = "rhasspy/wake-word/"
 # Input
 EVENT_START = EVENT_PREFIX + "start-listening"
 EVENT_STOP = EVENT_PREFIX + "stop-listening"
+EVENT_RELOAD = EVENT_PREFIX + "reload"
 
 # Output
 EVENT_ERROR = EVENT_PREFIX + "error"
 EVENT_STARTED = EVENT_PREFIX + "listening-started"
 EVENT_STOPPED = EVENT_PREFIX + "listening-stopped"
 EVENT_DETECTED = EVENT_PREFIX + "detected"
-EVENT_RECEIVNG_AUDIO = EVENT_PREFIX + "receiving-audio"
+EVENT_RECEIVING_AUDIO = EVENT_PREFIX + "receiving-audio"
+EVENT_RELOADED = EVENT_PREFIX + "reloaded"
 
 # -------------------------------------------------------------------------------------------------
 
@@ -89,7 +91,7 @@ def wait_for_wake_word(
                         if listening:
                             if report_audio:
                                 logger.debug("Receiving audio")
-                                send_event(EVENT_RECEIVNG_AUDIO + request_id)
+                                send_event(EVENT_RECEIVING_AUDIO + request_id)
                                 report_audio = False
 
                             # Process audio chunk
@@ -150,13 +152,29 @@ def wait_for_wake_word(
                     listening = False
                     logger.debug(f"Stopped listening (request_id={request_id})")
                     send_event(EVENT_STOPPED + request_id)
+                elif base_topic == EVENT_RELOAD:
+                    logger.debug("Reloading keyword(s)")
+                    event_dict = maybe_object(event)
+
+                    keyword = event_dict.get("keyword", keyword)
+                    if isinstance(keyword, str):
+                        keyword = [keyword]
+
+                    # Load porcupine
+                    handle = Porcupine(
+                        library,
+                        model,
+                        keyword_file_paths=keyword,
+                        sensitivities=sensitivities,
+                    )
+                    send_event(EVENT_RELOADED + request_id, event_dict)
             except Exception as e:
                 logger.exception(line)
                 send_event(EVENT_ERROR + request_id, {"error": str(e)})
     else:
         # Read all data from audio file, process, and stop
         chunk = audio_file.read(chunk_size)
-        while (len(chunk) == chunk_size):
+        while len(chunk) == chunk_size:
             # Process audio chunk
             chunk = struct.unpack_from(chunk_format, chunk)
             keyword_index = handle.process(chunk)
@@ -174,6 +192,15 @@ def wait_for_wake_word(
 
 # -------------------------------------------------------------------------------------------------
 
+
+def maybe_object(json_str):
+    try:
+        return json.loads(json_str)
+    except:
+        return {}
+
+
+# -------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     main()
