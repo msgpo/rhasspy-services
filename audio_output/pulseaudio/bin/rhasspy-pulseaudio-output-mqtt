@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 # -----------------------------------------------------------------------------
 # Command-line Arguments
 # -----------------------------------------------------------------------------
 
-if [[ -z "${shflags}" ]]; then
-    echo "Missing shflags"
-    exit 1
-fi
-
-. "${shflags}"
+. "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 
@@ -44,11 +43,11 @@ uri_played="${FLAGS_uri_played}"
 
 if [[ ! -z "${profile_dir}" ]]; then
     export profile_dir
-    source <(yq "${profile_dir}/profile.yml" \
-                -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-                -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
-                -q uri_played 'audio-output.mqtt-events.uri-played' "${uri_played}" | \
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
+                        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q play_uri 'audio-output.mqtt-events.play-uri' "${play_uri}" \
+                        -q uri_played 'audio-output.mqtt-events.uri-played' "${uri_played}" | \
                  tee /dev/stderr)
 fi
 

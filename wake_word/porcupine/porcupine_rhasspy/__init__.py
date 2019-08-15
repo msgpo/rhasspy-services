@@ -49,11 +49,11 @@ def wait_for_wake_word(
     chunk_size = handle.frame_length * 2
     chunk_format = "h" * handle.frame_length
 
-    logging.debug(
+    logger.debug(
         f"Loaded porcupine (keywords={keyword}, sensitivities={sensitivities})"
     )
 
-    logging.debug(
+    logger.debug(
         f"Expecting sample rate={handle.sample_rate}, frame length={handle.frame_length}"
     )
 
@@ -83,7 +83,7 @@ def wait_for_wake_word(
                                 if len(keyword) == 1:
                                     keyword_index = 0
 
-                                logging.debug(f"Keyword {keyword_index} detected")
+                                logger.debug(f"Keyword {keyword_index} detected")
                                 result = {
                                     "index": keyword_index,
                                     "keyword": keyword[keyword_index],
@@ -97,12 +97,12 @@ def wait_for_wake_word(
                     else:
                         time.sleep(0.01)
             except Exception as e:
-                logging.exception("read_audio")
+                logger.exception("read_audio")
 
         threading.Thread(target=read_audio, daemon=True).start()
 
         if auto_start:
-            logging.debug("Automatically started listening")
+            logger.debug("Automatically started listening")
             listening = True
             report_audio = True
 
@@ -114,7 +114,7 @@ def wait_for_wake_word(
                     if len(line) == 0:
                         continue
 
-                    logging.debug(line)
+                    logger.debug(line)
                     topic, event = line.split(" ", maxsplit=1)
                     if topic.startswith(event_start):
                         # Everything after expected topic is request id
@@ -123,14 +123,14 @@ def wait_for_wake_word(
                         # Clear buffer and start reading
                         listening = True
                         report_audio = True
-                        logging.debug(f"Started listening (request_id={request_id})")
+                        logger.debug(f"Started listening (request_id={request_id})")
                     elif topic.startswith(event_stop):
                         # Everything after expected topic is request id
                         request_id = topic[len(event_start) :]
 
                         # Stop reading and transcribe
                         listening = False
-                        logging.debug(f"Stopped listening (request_id={request_id})")
+                        logger.debug(f"Stopped listening (request_id={request_id})")
 
         else:
             # Wait forever
@@ -152,7 +152,7 @@ def wait_for_wake_word(
                     if len(keyword) == 1:
                         keyword_index = 0
 
-                    logging.debug(f"Keyword {keyword_index} detected")
+                    logger.debug(f"Keyword {keyword_index} detected")
                     result = {"index": keyword_index, "keyword": keyword[keyword_index]}
 
                     print(event_detected + request_id, end=" ")

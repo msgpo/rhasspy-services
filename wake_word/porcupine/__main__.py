@@ -71,7 +71,7 @@ def main():
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    logging.debug(args)
+    logger.debug(args)
 
     wait_for_wake_word(**vars(args))
 

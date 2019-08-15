@@ -6,8 +6,10 @@ logger = logging.getLogger("webrtcvad_rhasspy")
 import sys
 import argparse
 import math
-import jsonlines
+import threading
+from queue import Queue
 
+import jsonlines
 import webrtcvad
 
 # -----------------------------------------------------------------------------
@@ -59,6 +61,7 @@ def wait_for_command(
     vad = webrtcvad.Vad()
     vad.set_mode(vad_mode)
 
+    audio_chunks = Queue()
     report_audio = False
 
     # Pre-compute values
@@ -66,8 +69,8 @@ def wait_for_command(
     speech_buffers = int(math.ceil(speech_seconds / seconds_per_buffer))
 
     # Processes one voice command
-    def read_audio(request_id=""):
-        nonlocal report_audio
+    def process_audio(request_id=""):
+        nonlocal audio_chunks
 
         # State
         max_buffers = int(math.ceil(max_seconds / seconds_per_buffer))
@@ -86,14 +89,7 @@ def wait_for_command(
         current_seconds = 0
 
         while True:
-            chunk = audio_file.read(chunk_size)
-            if len(chunk) < chunk_size:
-                break  # TODO: buffer instead of bailing
-
-            if report_audio:
-                logger.debug("Receiving audio")
-                report_audio = False
-
+            chunk = audio_chunks.get()
             buffer_count += 1
             current_seconds += seconds_per_buffer
 
@@ -158,6 +154,27 @@ def wait_for_command(
 
     # -------------------------------------------------------------------------
 
+    def read_audio():
+        nonlocal audio_file, audio_chunks, report_audio
+        try:
+            while True:
+                chunk = audio_file.read(chunk_size)
+                if len(chunk) == chunk_size:
+                    if report_audio:
+                        logger.debug("Receiving audio")
+                        report_audio = False
+
+                    audio_chunks.put(chunk)
+                else:
+                    # Avoid 100% CPU usage
+                    time.sleep(0.01)
+        except Exception as e:
+            logger.exception("read_audio")
+
+    threading.Thread(target=read_audio, daemon=True).start()
+
+    # -------------------------------------------------------------------------
+
     if events_file:
         # Wait for start event
         with open(events_file, "r") as events:
@@ -172,10 +189,14 @@ def wait_for_command(
                     # Everything after expected topic is request id
                     request_id = topic[len(event_start) :]
 
+                    # Clear audio queue
+                    with audio_chunks.mutex:
+                        audio_chunks.queue.clear()
+
                     # Process voice command
                     logger.debug(f"Started listening (request_id={request_id})")
                     report_audio = True
-                    read_audio(request_id)
+                    process_audio(request_id)
     else:
         # Process a voice command immediately
         report_audio = True
