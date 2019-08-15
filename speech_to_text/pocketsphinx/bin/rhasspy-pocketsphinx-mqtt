@@ -102,7 +102,7 @@ nc -ukl "${audio_host}" "${audio_port}" | \
         "${args[@]}" \
         --events-in-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}") | \
     tee /dev/stderr | \
-    while read -r topic json;
+    while read -r topic payload;
     do
-        echo -n "${json}" | mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -s -t "${topic}"
+        mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"
     done

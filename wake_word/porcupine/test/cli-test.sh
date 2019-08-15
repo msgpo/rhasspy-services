@@ -10,7 +10,8 @@ function porcupine_test {
         rhasspy-porcupine \
             --library "${this_dir}/../lib/x86_64/libpv_porcupine.so" \
             --model "${this_dir}/../lib/common/porcupine_params.pv" \
-            --keyword "${this_dir}/../resources/keyword_files/linux/porcupine_linux.ppn"
+            --keyword "${this_dir}/../resources/keyword_files/linux/porcupine_linux.ppn" | \
+        cut -d' ' -f2-
 }
 
 export porcupine_test

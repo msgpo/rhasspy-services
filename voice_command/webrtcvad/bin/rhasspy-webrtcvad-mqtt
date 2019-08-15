@@ -15,6 +15,7 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 # MQTT
 DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+DEFINE_string 'mqtt-topic' 'rhasspy/voice-command/#' 'MQTT topic to subscribe to'
 
 # Audio
 DEFINE_string 'audio-host' '0.0.0.0' 'Host for UDP audio input stream'
@@ -44,6 +45,7 @@ profile_dir="${FLAGS_profile}"
 
 mqtt_host="${FLAGS_mqtt_host}"
 mqtt_port="${FLAGS_mqtt_port}"
+mqtt_topic="${FLAGS_mqtt_topic}"
 
 audio_host="${FLAGS_audio_host}"
 audio_port="${FLAGS_audio_port}"
@@ -51,13 +53,6 @@ audio_port="${FLAGS_audio_port}"
 if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
     debug='--debug'
 fi
-
-start_listening="${FLAGS_start_listening}"
-speech="${FLAGS_speech}"
-silence="${FLAGS_silence}"
-command_started="${FLAGS_command_started}"
-command_stopped="${FLAGS_command_stopped}"
-command_timeout="${FLAGS_command_timeout}"
 
 # -----------------------------------------------------------------------------
 # Profile
@@ -68,14 +63,9 @@ if [[ ! -z "${profile_dir}" ]]; then
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                         -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
                         -q audio_host 'voice-command.audio-input.host' "${audio_host}" \
-                        -q audio_port 'voice-command.audio-input.port' "${audio_port}" \
-                        -q start_listening 'voice-command.mqtt-events.start-listening' "${start_listening}" \
-                        -q speech 'voice-command.mqtt-events.speech' "${speech}" \
-                        -q silence 'voice-command.mqtt-events.silence' "${silence}" \
-                        -q command_started 'voice-command.mqtt-events.command-started' "${command_started}" \
-                        -q command_stopped 'voice-command.mqtt-events.command-stopped' "${command_stopped}" \
-                        -q command_timeout 'voice-command.mqtt-events.command-timeout' "${command_timeout}" | \
+                        -q audio_port 'voice-command.audio-input.port' "${audio_port}" | \
                  tee /dev/stderr)
 fi
 
@@ -91,13 +81,7 @@ fi
 nc -ukl "${audio_host}" "${audio_port}" | \
     rhasspy-webrtcvad \
         "${args[@]}" \
-        --events-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}/#") \
-        --event-start "${start_listening}" \
-        --event-command-start "${command_started}" \
-        --event-command-stop "${command_stopped}" \
-        --event-command-timeout "${command_timeout}" \
-        --event-speech "${speech}" \
-        --event-silence "${silence}" | \
+        --events-in-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}") | \
     while read -r topic payload;
     do
         mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"

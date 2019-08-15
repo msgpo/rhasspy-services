@@ -10,31 +10,47 @@ import time
 import argparse
 import threading
 import struct
-
-from typing import List
+from typing import List, BinaryIO, TextIO, Optional
 
 from .porcupine import Porcupine
+
+# -------------------------------------------------------------------------------------------------
+# MQTT Events
+# -------------------------------------------------------------------------------------------------
+
+EVENT_PREFIX = "rhasspy/wake-word/"
+
+# Input
+EVENT_START = EVENT_PREFIX + "start-listening"
+EVENT_STOP = EVENT_PREFIX + "stop-listening"
+
+# Output
+EVENT_ERROR = EVENT_PREFIX + "error"
+EVENT_STARTED = EVENT_PREFIX + "listening-started"
+EVENT_STOPPED = EVENT_PREFIX + "listening-stopped"
+EVENT_DETECTED = EVENT_PREFIX + "detected"
+EVENT_RECEIVNG_AUDIO = EVENT_PREFIX + "receiving-audio"
 
 # -------------------------------------------------------------------------------------------------
 
 
 def wait_for_wake_word(
+    audio_file: BinaryIO,
+    events_out_file: TextIO,
     library: str,
     model: str,
     keyword: List[str],
-    audio_file=None,
-    events_file=None,
+    events_in_file: Optional[TextIO] = None,
     sensitivity: List[float] = [],
-    event_start: str = "start",
-    event_stop: str = "start",
-    event_detected: str = "detected",
     auto_start: bool = False,
-    debug: bool = False,
 ):
-    if audio_file:
-        audio_file = open(audio_file, "rb")
-    else:
-        audio_file = sys.stdin.buffer
+    def send_event(topic, payload_dict={}):
+        print(topic, end=" ")
+
+        with jsonlines.Writer(events_out_file) as out:
+            out.write(payload_dict)
+
+        events_out_file.flush()
 
     # Ensure each keyword has a sensitivity value
     sensitivities = sensitivity
@@ -60,7 +76,7 @@ def wait_for_wake_word(
     request_id = ""
     report_audio = False
 
-    if events_file or auto_start:
+    if events_in_file:
         listening = False
 
         # Read thread
@@ -69,10 +85,11 @@ def wait_for_wake_word(
             try:
                 while True:
                     chunk = audio_file.read(chunk_size)
-                    if len(chunk) > 0:
+                    if len(chunk) == chunk_size:
                         if listening:
                             if report_audio:
                                 logger.debug("Receiving audio")
+                                send_event(EVENT_RECEIVNG_AUDIO + request_id)
                                 report_audio = False
 
                             # Process audio chunk
@@ -89,12 +106,9 @@ def wait_for_wake_word(
                                     "keyword": keyword[keyword_index],
                                 }
 
-                                print(event_detected + request_id, end=" ")
-                                with jsonlines.Writer(sys.stdout) as out:
-                                    out.write(result)
-
-                                sys.stdout.flush()
+                                send_event(EVENT_DETECTED + request_id, result)
                     else:
+                        # Prevent 100% CPU usage
                         time.sleep(0.01)
             except Exception as e:
                 logger.exception("read_audio")
@@ -106,58 +120,54 @@ def wait_for_wake_word(
             listening = True
             report_audio = True
 
-        if events_file:
-            # Wait for start/stop events
-            with open(events_file, "r") as events:
-                while True:
-                    line = events.readline().strip()
-                    if len(line) == 0:
-                        continue
+        # Process events
+        for line in events_in_file:
+            line = line.strip()
+            if len(line) == 0:
+                continue
 
-                    logger.debug(line)
-                    topic, event = line.split(" ", maxsplit=1)
-                    if topic.startswith(event_start):
-                        # Everything after expected topic is request id
-                        request_id = topic[len(event_start) :]
+            logger.debug(line)
 
-                        # Clear buffer and start reading
-                        listening = True
-                        report_audio = True
-                        logger.debug(f"Started listening (request_id={request_id})")
-                    elif topic.startswith(event_stop):
-                        # Everything after expected topic is request id
-                        request_id = topic[len(event_start) :]
+            try:
+                # Expected <topic> <payload> on each line
+                topic, event = line.split(" ", maxsplit=1)
+                topic_parts = topic.split("/")
+                base_topic = "/".join(topic_parts[:3])
 
-                        # Stop reading and transcribe
-                        listening = False
-                        logger.debug(f"Stopped listening (request_id={request_id})")
+                # Everything after base topic is request id
+                request_id = "/" + "/".join(topic_parts[3:])
 
-        else:
-            # Wait forever
-            threading.Event().wait()
-
+                if base_topic == EVENT_START:
+                    # Clear buffer and start reading
+                    listening = True
+                    report_audio = True
+                    logger.debug(f"Started listening (request_id={request_id})")
+                    send_event(EVENT_STARTED + request_id)
+                elif base_topic == EVENT_STOP:
+                    # Stop reading and transcribe
+                    listening = False
+                    logger.debug(f"Stopped listening (request_id={request_id})")
+                    send_event(EVENT_STOPPED + request_id)
+            except Exception as e:
+                logger.exception(line)
+                send_event(EVENT_ERROR + request_id, {"error": str(e)})
     else:
         # Read all data from audio file, process, and stop
-        audio_data = audio_file.read()
-        while len(audio_data) > 0:
-            chunk = audio_data[:chunk_size]
-            audio_data = audio_data[chunk_size:]
+        chunk = audio_file.read(chunk_size)
+        while (len(chunk) == chunk_size):
+            # Process audio chunk
+            chunk = struct.unpack_from(chunk_format, chunk)
+            keyword_index = handle.process(chunk)
 
-            if len(chunk) == chunk_size:
-                # Process audio chunk
-                chunk = struct.unpack_from(chunk_format, chunk)
-                keyword_index = handle.process(chunk)
+            if keyword_index:
+                if len(keyword) == 1:
+                    keyword_index = 0
 
-                if keyword_index:
-                    if len(keyword) == 1:
-                        keyword_index = 0
+                logger.debug(f"Keyword {keyword_index} detected")
+                result = {"index": keyword_index, "keyword": keyword[keyword_index]}
+                send_event(EVENT_DETECTED, result)
 
-                    logger.debug(f"Keyword {keyword_index} detected")
-                    result = {"index": keyword_index, "keyword": keyword[keyword_index]}
-
-                    print(event_detected + request_id, end=" ")
-                    with jsonlines.Writer(sys.stdout) as out:
-                        out.write(result)
+            chunk = audio_file.read(chunk_size)
 
 
 # -------------------------------------------------------------------------------------------------

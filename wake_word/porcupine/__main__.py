@@ -20,8 +20,13 @@ def main():
         default=None,
     )
     parser.add_argument(
-        "--events-file",
+        "--events-in-file",
         help="File to read events from (one per line, topic followed by JSON)",
+        default=None,
+    )
+    parser.add_argument(
+        "--events-out-file",
+        help="File to write events to (one per line, topic followed by JSON)",
         default=None,
     )
     parser.add_argument(
@@ -45,21 +50,6 @@ def main():
         default=[],
     )
     parser.add_argument(
-        "--event-start",
-        help="Topic to start reading audio data (default=start)",
-        default="start",
-    )
-    parser.add_argument(
-        "--event-stop",
-        help="Topic to stop reading audio data (default=stop)",
-        default="stop",
-    )
-    parser.add_argument(
-        "--event-detected",
-        help="Topic to publish when wake word is detected (default=detected)",
-        default="detected",
-    )
-    parser.add_argument(
         "--auto-start", action="store_true", help="Start listening immediately"
     )
     parser.add_argument(
@@ -73,7 +63,35 @@ def main():
 
     logger.debug(args)
 
-    wait_for_wake_word(**vars(args))
+    # -------------------------------------------------------------------------
+
+    if args.audio_file:
+        audio_file = open(audio_file, "r")
+    else:
+        audio_file = sys.stdin.buffer
+
+    # File to read events from
+    events_in_file = None
+    if args.events_in_file and (args.events_in_file != "-"):
+        events_in_file = open(args.events_in_file, "r")
+
+    # File to write events to
+    events_out_file = sys.stdout
+    if args.events_out_file and (args.events_out_file != "-"):
+        events_out_file = open(args.events_out_file, "w")
+
+    # -------------------------------------------------------------------------
+
+    wait_for_wake_word(
+        audio_file=audio_file,
+        events_in_file=events_in_file,
+        events_out_file=events_out_file,
+        library=args.library,
+        model=args.model,
+        keyword=args.keyword,
+        sensitivity=args.sensitivity,
+        auto_start=args.auto_start,
+    )
 
 
 # -------------------------------------------------------------------------------------------------

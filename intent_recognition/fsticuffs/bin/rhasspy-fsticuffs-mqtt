@@ -91,7 +91,7 @@ args+=("$@")
 mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}" | \
     rhasspy-fsticuffs "${args[@]}" | \
     tee /dev/stderr | \
-    while read -r topic json;
+    while read -r topic payload;
     do
-        echo "${json}" | mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -s -t "${topic}"
+        mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"
     done

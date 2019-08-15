@@ -20,8 +20,13 @@ def main():
         default=None,
     )
     parser.add_argument(
-        "--events-file",
+        "--events-in-file",
         help="File to read events from (one per line, topic followed by JSON)",
+        default=None,
+    )
+    parser.add_argument(
+        "--events-out-file",
+        help="File to write events to (one per line, topic followed by JSON)",
         default=None,
     )
     parser.add_argument(
@@ -61,36 +66,6 @@ def main():
         default=0.5,
     )
     parser.add_argument(
-        "--event-start",
-        help="Topic to start reading audio data (default=start)",
-        default="start",
-    )
-    parser.add_argument(
-        "--event-speech",
-        help="Topic when speech is detected (default=speech)",
-        default="speech",
-    )
-    parser.add_argument(
-        "--event-silence",
-        help="Topic when silence is detected (default=silence)",
-        default="silence",
-    )
-    parser.add_argument(
-        "--event-command-start",
-        help="Topic when voice command starts (default=command-start)",
-        default="command-start",
-    )
-    parser.add_argument(
-        "--event-command-stop",
-        help="Topic when voice command stops (default=command-stop)",
-        default="command-stop",
-    )
-    parser.add_argument(
-        "--event-command-timeout",
-        help="Topic when voice command times out (default=command-timeout)",
-        default="command-timeout",
-    )
-    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to standard out"
     )
 
@@ -101,7 +76,36 @@ def main():
 
     logging.debug(args)
 
-    wait_for_command(**vars(args))
+    # -------------------------------------------------------------------------
+
+    if args.audio_file:
+        audio_file = open(audio_file, "r")
+    else:
+        audio_file = sys.stdin.buffer
+
+    # File to read events from
+    events_in_file = None
+    if args.events_in_file and (args.events_in_file != "-"):
+        events_in_file = open(args.events_in_file, "r")
+
+    # File to write events to
+    events_out_file = sys.stdout
+    if args.events_out_file and (args.events_out_file != "-"):
+        events_out_file = open(args.events_out_file, "w")
+
+    # -------------------------------------------------------------------------
+
+    wait_for_command(
+        audio_file=audio_file,
+        events_in_file=events_in_file,
+        events_out_file=events_out_file,
+        vad_mode=args.vad_mode,
+        chunk_size=args.chunk_size,
+        min_seconds=args.min_seconds,
+        max_seconds=args.max_seconds,
+        speech_seconds=args.speech_seconds,
+        silence_seconds=args.silence_seconds,
+    )
 
 
 # -------------------------------------------------------------------------------------------------

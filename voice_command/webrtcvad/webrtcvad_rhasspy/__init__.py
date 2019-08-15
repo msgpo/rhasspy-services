@@ -7,17 +7,38 @@ import sys
 import argparse
 import math
 import threading
+import time
 from queue import Queue
+from typing import List, BinaryIO, TextIO, Optional
 
 import jsonlines
 import webrtcvad
+
+# -------------------------------------------------------------------------------------------------
+# MQTT Events
+# -------------------------------------------------------------------------------------------------
+
+EVENT_PREFIX = "rhasspy/voice-command/"
+
+# Input
+EVENT_START = EVENT_PREFIX + "start-listening"
+
+# Output
+EVENT_ERROR = EVENT_PREFIX + "error"
+EVENT_SPEECH = EVENT_PREFIX + "speech"
+EVENT_SILENCE = EVENT_PREFIX + "silence"
+EVENT_STARTED = EVENT_PREFIX + "command-started"
+EVENT_STOPPED = EVENT_PREFIX + "command-stopped"
+EVENT_TIMEOUT = EVENT_PREFIX + "command-timeout"
+EVENT_RECEIVNG_AUDIO = EVENT_PREFIX + "receiving-audio"
 
 # -----------------------------------------------------------------------------
 
 
 def wait_for_command(
-    audio_file=None,
-    events_file=None,
+    audio_file: BinaryIO,
+    events_out_file: TextIO,
+    events_in_file: Optional[TextIO] = None,
     vad_mode=3,
     sample_rate=16000,
     chunk_size=960,
@@ -25,37 +46,24 @@ def wait_for_command(
     max_seconds=30,
     speech_seconds=0.3,
     silence_seconds=0.5,
-    event_start="start",
-    event_speech="speech",
-    event_silence="silence",
-    event_command_start="command-start",
-    event_command_stop="command-stop",
-    event_command_timeout="command-timeout",
-    debug=False,
 ):
-    if audio_file:
-        audio_file = open(audio_file, "r")
-    else:
-        audio_file = sys.stdin.buffer
-
-    def send_event(topic, payload):
+    def send_event(topic, payload_dict={}):
         print(topic, end=" ")
 
-        with jsonlines.Writer(sys.stdout) as out:
-            out.write(payload)
+        with jsonlines.Writer(events_out_file) as out:
+            out.write(payload_dict)
 
-        sys.stdout.flush()
+        events_out_file.flush()
 
     # Verify settings
     sample_rate = 16000
     assert vad_mode in range(1, 4), f"VAD mode must be 1-3 (got {vad_mode})"
 
     chunk_ms = 1000 * ((chunk_size / 2) / sample_rate)
-    assert chunk_ms in [
-        10,
-        20,
-        30,
-    ], f"Sample rate and chunk size must make for 10, 20, or 30 ms buffer sizes, assuming 16-bit mono audio (got {chunk_ms} ms)"
+    assert chunk_ms in [10, 20, 30], (
+        "Sample rate and chunk size must make for 10, 20, or 30 ms buffer sizes,"
+        + f" assuming 16-bit mono audio (got {chunk_ms} ms)"
+    )
 
     # Voice detector
     vad = webrtcvad.Vad()
@@ -63,6 +71,7 @@ def wait_for_command(
 
     audio_chunks = Queue()
     report_audio = False
+    request_id = ""
 
     # Pre-compute values
     seconds_per_buffer = chunk_size / sample_rate
@@ -98,19 +107,17 @@ def wait_for_command(
             if max_buffers <= 0:
                 # Timeout
                 logger.warn("Timeout")
-                send_event(
-                    event_command_timeout + request_id, {"seconds": current_seconds}
-                )
+                send_event(EVENT_TIMEOUT + request_id, {"seconds": current_seconds})
                 break
 
             # Detect speech in chunk
             is_speech = vad.is_speech(chunk, sample_rate)
             if is_speech and not last_speech:
                 # Silence -> speech
-                send_event(event_speech + request_id, {"seconds": current_seconds})
+                send_event(EVENT_SPEECH + request_id, {"seconds": current_seconds})
             elif not is_speech and last_speech:
                 # Speech -> silence
-                send_event(event_silence + request_id, {"seconds": current_seconds})
+                send_event(EVENT_SILENCE + request_id, {"seconds": current_seconds})
 
             last_speech = is_speech
 
@@ -120,9 +127,7 @@ def wait_for_command(
             elif is_speech and not in_phrase:
                 # Start of phrase
                 logger.debug("Voice command started")
-                send_event(
-                    event_command_start + request_id, {"seconds": current_seconds}
-                )
+                send_event(EVENT_STARTED + request_id, {"seconds": current_seconds})
 
                 in_phrase = True
                 after_phrase = False
@@ -141,9 +146,7 @@ def wait_for_command(
                 elif after_phrase and (silence_buffers <= 0):
                     # Phrase complete
                     logger.debug("Voice command finished")
-                    send_event(
-                        event_command_stop + request_id, {"seconds": current_seconds}
-                    )
+                    send_event(EVENT_STOPPED + request_id, {"seconds": current_seconds})
                     break
                 elif in_phrase and (min_phrase_buffers <= 0):
                     # Transition to after phrase
@@ -155,13 +158,14 @@ def wait_for_command(
     # -------------------------------------------------------------------------
 
     def read_audio():
-        nonlocal audio_file, audio_chunks, report_audio
+        nonlocal audio_file, audio_chunks, report_audio, request_id
         try:
             while True:
                 chunk = audio_file.read(chunk_size)
                 if len(chunk) == chunk_size:
                     if report_audio:
                         logger.debug("Receiving audio")
+                        send_event(EVENT_RECEIVNG_AUDIO + request_id)
                         report_audio = False
 
                     audio_chunks.put(chunk)
@@ -175,20 +179,25 @@ def wait_for_command(
 
     # -------------------------------------------------------------------------
 
-    if events_file:
+    if events_in_file:
         # Wait for start event
-        with open(events_file, "r") as events:
-            while True:
-                line = events.readline().strip()
-                if len(line) == 0:
-                    continue
+        for line in events_in_file:
+            line = line.strip()
+            if len(line) == 0:
+                continue
 
-                logger.debug(line)
+            logger.debug(line)
+
+            try:
+                # Expected <topic> <payload> on each line
                 topic, event = line.split(" ", maxsplit=1)
-                if topic.startswith(event_start):
-                    # Everything after expected topic is request id
-                    request_id = topic[len(event_start) :]
+                topic_parts = topic.split("/")
+                base_topic = "/".join(topic_parts[:3])
 
+                # Everything after base topic is request id
+                request_id = "/" + "/".join(topic_parts[3:])
+
+                if base_topic == EVENT_START:
                     # Clear audio queue
                     with audio_chunks.mutex:
                         audio_chunks.queue.clear()
@@ -197,10 +206,16 @@ def wait_for_command(
                     logger.debug(f"Started listening (request_id={request_id})")
                     report_audio = True
                     process_audio(request_id)
+            except Exception as e:
+                logger.exception(line)
+                send_event(EVENT_ERROR + request_id, {"error": str(e)})
     else:
         # Process a voice command immediately
-        report_audio = True
-        read_audio()
+        chunk = audio_file.read(chunk_size)
+        while len(chunk) == chunk_size:
+            audio_chunks.put(chunk)
+            process_audio()
+            chunk = audio_file.read(chunk_size)
 
 
 # -----------------------------------------------------------------------------
