@@ -18,6 +18,25 @@ import pocketsphinx
 from speech_to_text.pocketsphinx.pocketsphinx_rhasspy import get_decoder, transcribe
 
 # -------------------------------------------------------------------------------------------------
+# MQTT Events
+# -------------------------------------------------------------------------------------------------
+
+EVENT_PREFIX = "rhasspy/speech-to-text/"
+
+# Input
+EVENT_START = EVENT_PREFIX + "start-listening"
+EVENT_STOP = EVENT_PREFIX + "stop-listening"
+EVENT_RELOAD = EVENT_PREFIX + "reload"
+
+# Output
+EVENT_ERROR = EVENT_PREFIX + "error"
+EVENT_RECEIVNG_AUDIO = EVENT_PREFIX + "receiving-audio"
+EVENT_TEXT_CAPTURED = EVENT_PREFIX + "text-captured"
+EVENT_STARTED = EVENT_PREFIX + "listening-started"
+EVENT_STOPPED = EVENT_PREFIX + "listening-stopped"
+EVENT_RELOADED = EVENT_PREFIX + "reloaded"
+
+# -------------------------------------------------------------------------------------------------
 
 
 def main():
@@ -67,26 +86,6 @@ def main():
         help="Include up to N best alternative transcriptions",
     )
     parser.add_argument(
-        "--event-start",
-        help="Topic to start reading audio data (default=start)",
-        default="start",
-    )
-    parser.add_argument(
-        "--event-stop",
-        help="Topic to stop reading audio data and transcribe (default=stop)",
-        default="stop",
-    )
-    parser.add_argument(
-        "--event-reload",
-        help="Topic to reload decoder (default=reload)",
-        default="stop",
-    )
-    parser.add_argument(
-        "--event-captured",
-        help="Topic to report transcription (default=captured)",
-        default="captured",
-    )
-    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
 
@@ -97,8 +96,10 @@ def main():
 
     logger.debug(args)
 
+    # -------------------------------------------------------------------------
+
     audio_file = sys.stdin.buffer
-    if args.audio_file and not (args.audio_file == "-"):
+    if args.audio_file and (args.audio_file != "-"):
         if not args.audio_file_lines:
             # Contains raw audio data
             audio_file = open(args.audio_file, "rb")
@@ -128,6 +129,13 @@ def main():
     if args.events_out_file and not (args.events_out_file == "-"):
         events_out_file = open(args.events_out_file, "w")
 
+    def send_event(topic, payload_dict={}):
+        print(topic, end=" ", file=events_out_file)
+        with jsonlines.Writer(events_out_file) as out:
+            out.write(payload_dict)
+
+        events_out_file.flush()
+
     # -------------------------------------------------------------------------
 
     if events_in_file:
@@ -149,7 +157,9 @@ def main():
                         chunk = audio_file.read(args.chunk_size)
                         if len(chunk) > 0:
                             if report_audio:
+                                # Inform user that audio is being successfully received
                                 logger.debug("Receiving audio")
+                                send_event(EVENT_RECEIVNG_AUDIO)
                                 report_audio = False
 
                             with audio_data_lock:
@@ -172,89 +182,106 @@ def main():
 
             logger.debug(line)
 
-            # Expected <topic> <payload> on each line
-            topic, event = line.split(" ", maxsplit=1)
-            if topic.startswith(args.event_start):
-                # Everything after expected topic is request id
-                request_id = topic[len(args.event_start) :]
+            try:
+                # Expected <topic> <payload> on each line
+                topic, event = line.split(" ", maxsplit=1)
+                topic_parts = topic.split("/")
+                base_topic = "/".join(topic_parts[:3])
 
-                if args.audio_file_lines:
-                    # Get next file path
-                    audio_path = audio_file.readline().strip()
-                    logger.debug(f"Reading raw audio data from {audio_path}")
-                    with open(audio_path, "rb") as actual_audio_file:
-                        # Read entire file
-                        audio_data[request_id] = actual_audio_file.read()
-                else:
-                    # Clear buffer and start reading asynchronously
+                # Everything after base topic is request id
+                request_id = "/" + "/".join(topic_parts[3:])
+
+                if base_topic == EVENT_START:
+                    if args.audio_file_lines:
+                        # Get next file path
+                        audio_path = audio_file.readline().strip()
+                        logger.debug(f"Reading raw audio data from {audio_path}")
+                        with open(audio_path, "rb") as actual_audio_file:
+                            # Read entire file
+                            audio_data[request_id] = actual_audio_file.read()
+                    else:
+                        # Clear buffer and start reading asynchronously
+                        with audio_data_lock:
+                            audio_data[request_id] = bytes()
+
+                        logger.debug(f"Started listening (request_id={request_id})")
+                        report_audio = True
+
+                    send_event(EVENT_STARTED + request_id)
+                elif base_topic == EVENT_STOP:
+                    # Stop reading and transcribe
                     with audio_data_lock:
-                        audio_data[request_id] = bytes()
+                        audio_buffer = audio_data.pop(request_id, bytes())
+                        logger.debug(
+                            f"Stopped listening. Decoding {len(audio_buffer)} bytes (request_id={request_id})"
+                        )
 
-                    logger.debug(f"Started listening (request_id={request_id})")
-                    report_audio = True
+                    event_dict = maybe_object(event)
+                    send_event(EVENT_STOPPED + request_id, event_dict)
 
-            elif topic.startswith(args.event_stop):
-                # Everything after expected topic is response id
-                response_id = topic[len(args.event_stop) :]
+                    # Transcribe audio data
+                    result = transcribe(decoder, audio_buffer, nbest=args.nbest)
+                    logger.debug(result.get("text", ""))
 
-                # Stop reading and transcribe
-                with audio_data_lock:
-                    audio_buffer = audio_data.pop(response_id, bytes())
-                    logger.debug(
-                        f"Stopped listening. Decoding {len(audio_buffer)} bytes (response_id={response_id})"
+                    # Merge stop event data into result
+                    try:
+                        event_dict = json.loads(event)
+                        for key, value in event_dict.items():
+                            result[key] = value
+                    except:
+                        pass
+
+                    send_event(EVENT_TEXT_CAPTURED + request_id, result)
+                elif base_topic == EVENT_RELOAD:
+                    # Re-load pocketsphinx decoder
+                    logger.debug("Reloading decoder.")
+                    event_dict = maybe_object(event)
+
+                    try:
+                        # Load new settings
+                        args.acoustic_model = event_dict.get(
+                            "acoustic-model", args.acoustic_model
+                        )
+                        args.language_model = event_dict.get(
+                            "language-model", args.language_model
+                        )
+                        args.dictionary = event_dict.get("dictionary", args.dictionary)
+                        args.mllr_matrix = event_dict.get(
+                            "mllr-matrix", args.mllr_matrix
+                        )
+                    except Exception as e:
+                        logger.exception("reload")
+
+                    # Load decoder again
+                    decoder = get_decoder(
+                        args.acoustic_model,
+                        args.dictionary,
+                        args.language_model,
+                        mllr_matrix=args.mllr_matrix,
+                        debug=args.debug,
                     )
 
-                result = transcribe(decoder, audio_buffer, nbest=args.nbest)
-                logger.debug(result.get("text", ""))
-
-                # Merge stop event data into result
-                try:
-                    event_dict = json.loads(event)
-                    for key, value in event_dict.items():
-                        result[key] = value
-                except:
-                    pass
-
-                # Write output event
-                print(args.event_captured + response_id, end=" ", file=events_out_file)
-
-                with jsonlines.Writer(events_out_file) as out:
-                    out.write(result)
-
-                events_out_file.flush()
-            elif topic.startswith(args.event_reload):
-                # Re-load pocketsphinx decoder
-                logger.debug("Reloading decoder.")
-
-                try:
-                    # Load new settings
-                    event_dict = json.loads(event)
-                    args.acoustic_model = event_dict.get(
-                        "acoustic-model", args.acoustic_model
-                    )
-                    args.language_model = event_dict.get(
-                        "language-model", args.language_model
-                    )
-                    args.dictionary = event_dict.get("dictionary", args.dictionary)
-                    args.mllr_matrix = event_dict.get("mllr-matrix", args.mllr_matrix)
-                except Exception as e:
-                    logger.exception("reload")
-
-                # Load decoder again
-                decoder = get_decoder(
-                    args.acoustic_model,
-                    args.dictionary,
-                    args.language_model,
-                    mllr_matrix=args.mllr_matrix,
-                    debug=args.debug,
-                )
+                    send_event(EVENT_RELOADED + request_id, event_dict)
+            except Exception as e:
+                logger.exception(line)
+                send_event(EVENT_ERROR, {"error": str(e)})
 
     else:
         # Read all data from audio file, decode, and stop
         audio_buffer = audio_file.read()
         result = transcribe(decoder, audio_buffer)
-        with jsonlines.Writer(sys.stdout) as out:
+        with jsonlines.Writer(events_out_file) as out:
             out.write(result)
+
+
+# -------------------------------------------------------------------------------------------------
+
+
+def maybe_object(json_str):
+    try:
+        return json.loads(json_str)
+    except:
+        return {}
 
 
 # -------------------------------------------------------------------------------------------------

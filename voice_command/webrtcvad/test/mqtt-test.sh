@@ -5,7 +5,7 @@ this_dir="$( cd "$( dirname "$0" )" && pwd )"
 mqtt_host='127.0.0.1'
 mqtt_port=1883
 audio_host="${mqtt_host}"
-audio_port=5000
+audio_port=12201
 audio_files=("${this_dir}/turn_on_living_room_lamp.wav")
 
 # Print responses when received

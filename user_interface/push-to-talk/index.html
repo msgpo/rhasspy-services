@@ -19,6 +19,10 @@
             <div id="connected" class="flex-grow-1 bg-danger text-white font-weight-bold p-2">NOT CONNECTED</div>
         </div>
 
+        <div class="d-flex h-100 text-center">
+            <div id="siteId" class="flex-grow-1 bg-info text-white font-weight-bold p-1"><span></span></div>
+        </div>
+
         <div class="d-flex h-100">
             <div class="flex-grow-1">
                 <button id="ptt" class="btn w-100">
@@ -57,8 +61,9 @@
          var label = 'push-to-talk'
          var hubHost = location.hostname
          var hubPort = 1884
-         var pubTopic = 'rhasspy/speech-to-text/text-captured'
 
+         var siteId = ''
+         var pubTopic = 'rhasspy/intent-recognition/recognize-intent'
          var subTopics = ['rhasspy/speech-to-text/text-captured',
                           'rhasspy/intent-recognition/intent-recognized',
                           'rhasspy/text-to-speech/speak-text']
@@ -69,10 +74,26 @@
              var url = new URL(window.location.href)
              hubHost = url.searchParams.get('host') || hubHost
              hubPort = url.searchParams.get('port') || hubPort
-             pubTopic = url.searchParams.get('pubTopic')
+             siteId = url.searchParams.get('siteId') || ''
+             pubTopic = url.searchParams.get('pubTopic') || pubTopic
              subTopics = url.searchParams.has('subTopic')
                        ? url.searchParams.getAll('subTopic')
                        : subTopics
+
+             if (siteId.length > 0) {
+                 $('#siteId span').text(siteId)
+                 $('#siteId').show()
+
+                if (!siteId.startsWith('/')) {
+                    siteId = '/' + siteId
+                }
+             } else {
+                 $('#siteId').hide()
+             }
+
+             for (var i = 0; i < subTopics.length; i++) {
+                 subTopics[i] = subTopics[i] + siteId + '/#'
+             }
 
              client = new Paho.Client(hubHost, Number(hubPort), label)
              $('#label').text(label)
@@ -100,20 +121,20 @@
              }
 
              client.onMessageArrived = function(message) {
-                 if (message.topic == 'rhasspy/speech-to-text/text-captured') {
+                 if (message.topic.startsWith('rhasspy/speech-to-text/text-captured')) {
                      setButtonColor('btn-primary')
                      payload = JSON.parse(message.payloadString)
                      if (payload.text.length > 0) {
                          addToChatHistory(payload.text)
                      }
-                 } else if (message.topic == 'rhasspy/intent-recognition/intent-recognized') {
+                 } else if (message.topic.startsWith('rhasspy/intent-recognition/intent-recognized')) {
                      payload = JSON.parse(message.payloadString)
                      if (payload.intent.name.length > 0) {
                          setButtonColor('btn-success')
                      } else {
                          setButtonColor('btn-danger')
                      }
-                 } else if (event_type == 'rhasspy/text-to-speech/speak-text') {
+                 } else if (event_type.startsWith('rhasspy/text-to-speech/say-text')) {
                      payload = JSON.parse(message.payloadString)
                      if (payload.text.length > 0) {
                          addToChatHistory(payload.text)
@@ -142,9 +163,8 @@
                  var text = $("#chat-text").val()
                  if (text.length > 0) {
                      addToChatHistory(text)
-                     sendEvent('rhasspy/speech-to-text/text-captured',
+                     sendEvent(pubTopic + siteId,
                                JSON.stringify({ 'text': text }))
-                     setButtonColor('btn-success')
                  }
              } catch {
                  setButtonColor('btn-danger')
@@ -165,12 +185,12 @@
 
          $('#ptt').mousedown(function(evt) {
              setButtonColor('btn-danger')
-             sendEvent('rhasspy/speech-to-text/start-listening', '{}')
+             sendEvent('rhasspy/speech-to-text/start-listening' + siteId, '{}')
          })
 
          $('#ptt').mouseup(function(evt) {
              clearButtonColor()
-             sendEvent('rhasspy/speech-to-text/stop-listening', '{}')
+             sendEvent('rhasspy/speech-to-text/stop-listening' + siteId, '{}')
          })
 
          // -------------------------------------------------------------------

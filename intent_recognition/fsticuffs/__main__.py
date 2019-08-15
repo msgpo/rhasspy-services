@@ -20,6 +20,21 @@ from intent_recognition.fsticuffs.fsticuffs import (
 )
 
 # -------------------------------------------------------------------------------------------------
+# MQTT Events
+# -------------------------------------------------------------------------------------------------
+
+EVENT_PREFIX = "rhasspy/intent-recognition/"
+
+# Input
+EVENT_RECOGNIZE = EVENT_PREFIX + "recognize-intent"
+EVENT_RELOAD = EVENT_PREFIX + "reload"
+
+# Output
+EVENT_ERROR = EVENT_PREFIX + "error"
+EVENT_RECOGNIZED = EVENT_PREFIX + "intent-recognized"
+EVENT_RELOADED = EVENT_PREFIX + "reloaded"
+
+# -------------------------------------------------------------------------------------------------
 
 
 def main():
@@ -43,6 +58,16 @@ def main():
         help="File with words that can be ignored during fuzzy recognition",
     )
     parser.add_argument(
+        "--events-in-file",
+        help="File to read events from (one per line, topic followed by JSON)",
+        default=None,
+    )
+    parser.add_argument(
+        "--events-out-file",
+        help="File to write events to (one per line, topic followed by JSON)",
+        default=None,
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
 
@@ -52,6 +77,27 @@ def main():
         logging.basicConfig(level=logging.DEBUG)
 
     logger.debug(args)
+
+    # -------------------------------------------------------------------------
+
+    # File to read events from
+    events_in_file = sys.stdin
+    if args.events_in_file and (args.events_in_file != "-"):
+        events_in_file = open(args.events_in_file, "r")
+
+    # File to write events to
+    events_out_file = sys.stdout
+    if args.events_out_file and (args.events_out_file != "-"):
+        events_out_file = open(args.events_out_file, "w")
+
+    def send_event(topic, payload_dict={}):
+        print(topic, end=" ", file=events_out_file)
+        with jsonlines.Writer(events_out_file) as out:
+            out.write(payload_dict)
+
+        events_out_file.flush()
+
+    # -------------------------------------------------------------------------
 
     # Load intent fst
     intent_fst = fst.Fst.read(args.intent_fst)
@@ -81,44 +127,68 @@ def main():
                 stop_words = set([line.strip() for line in stop_words_file])
 
     # Recognize lines from stdin
-    try:
-        for line in sys.stdin:
-            line = line.strip()
-            if len(line) == 0:
-                continue
+    for line in events_in_file:
+        line = line.strip()
+        if len(line) == 0:
+            continue
 
-            logger.debug(line)
+        logger.debug(line)
 
-            try:
-                # Try to interpret as JSON
-                request = json.loads(line)
-                line = request["text"]
-            except:
-                pass  # assume line is just text
+        try:
+            # Expected <topic> <payload> on each line
+            topic, event = line.split(" ", maxsplit=1)
+            topic_parts = topic.split("/")
+            base_topic = "/".join(topic_parts[:3])
 
-            if args.lower:
-                line = line.lower()
+            # Everything after base topic is request id
+            request_id = "/" + "/".join(topic_parts[3:])
 
-            if args.fuzzy:
-                # Fuzzy search
-                intent = recognize_fuzzy(
-                    intent_graph, line, known_tokens=known_tokens, stop_words=stop_words
-                )
-            else:
-                # Fast (strict) search
-                intent = recognize(intent_fst, line, known_tokens)
+            if base_topic == EVENT_RECOGNIZE:
+                event_dict = maybe_object(event)
+                text = event_dict.get("text", "")
 
-            # Output to stdout
-            with jsonlines.Writer(sys.stdout) as out:
-                out.write(intent)
+                if args.lower:
+                    text = text.lower()
 
-            sys.stdout.flush()
-    except KeyboardInterrupt:
-        pass
+                if args.fuzzy:
+                    # Fuzzy search
+                    intent = recognize_fuzzy(
+                        intent_graph,
+                        text,
+                        known_tokens=known_tokens,
+                        stop_words=stop_words,
+                    )
+                else:
+                    # Fast (strict) search
+                    intent = recognize(intent_fst, text, known_tokens)
+
+                send_event(EVENT_RECOGNIZED + request_id, intent)
+            elif base_topic == EVENT_RELOAD:
+                logging.debug("Reloading intent FST")
+
+                event_dict = maybe_object(event)
+                args.intent_fst = event_dict.get("intent-fst", args.intent_fst)
+
+                intent_fst = fst.Fst.read(args.intent_fst)
+                logger.debug(f"Loaded FST from {args.intent_fst}")
+
+                send_event(EVENT_RELOADED + request_id, event_dict)
+        except Exception as e:
+            logger.exception(line)
+            send_event(EVENT_ERROR, {"error": str(e)})
 
 
 # -------------------------------------------------------------------------------------------------
 
+
+def maybe_object(json_str):
+    try:
+        return json.loads(json_str)
+    except:
+        return {}
+
+
+# -------------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
     main()

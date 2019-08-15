@@ -5,12 +5,14 @@ this_dir="$( cd "$( dirname "$0" )" && pwd )"
 mqtt_host='127.0.0.1'
 mqtt_port=1883
 audio_host="${mqtt_host}"
-audio_port=5000
+audio_port=12202
 audio_files=("${this_dir}/turn_on_living_room_lamp.wav" "${this_dir}/what_time_is_it.wav")
 
 # Print responses when received
-mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" \
-              -v -t 'rhasspy/speech-to-text/text-captured/#' -C "${#audio_files[@]}" &
+(timeout 5s \
+         mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" \
+         -v -t 'rhasspy/speech-to-text/text-captured/#' -C "${#audio_files[@]}" && \
+     echo 'OK') &
 
 for audio_file in "${audio_files[@]}";
 do

@@ -20,7 +20,7 @@ DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
 
 # Audio
 DEFINE_string 'audio-host' '0.0.0.0' 'Host for UDP audio input stream'
-DEFINE_integer 'audio-port' 5000 'Port for UDP audio input stream'
+DEFINE_integer 'audio-port' 12200 'Port for UDP audio input stream'
 
 # Events
 DEFINE_string 'start-listening' 'rhasspy/wake-word/start-listening' 'Topic to start listening to audio stream'
