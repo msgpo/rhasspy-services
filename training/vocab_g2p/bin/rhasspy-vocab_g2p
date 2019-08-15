@@ -1,26 +1,83 @@
 #!/usr/bin/env bash
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+# phonetisaurus
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'model' '' 'Path to G2P fst model'
+DEFINE_integer 'nbest' 5 'Maximum number of hypotheses to produce'
+DEFINE_string 'unknown' '' 'Path to unknown words list'
+
+# vocab_g2p
+DEFINE_string 'output' '' 'Path to write guesses'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
 set -e
 
-# Check for help
-for arg in "$@";
-do
-    if [[ "${arg}" == '--help' ]]; then
-        phonetisaurus-apply --help
-        exit 0
-    fi
-done
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='true'
+fi
+
+model="${FLAGS_model}"
+nbest="${FLAGS_nbest}"
+unknown="${FLAGS_unknown}"
+output="${FLAGS_output}"
+
+# -----------------------------------------------------------------------------
+# Required Settings
+# -----------------------------------------------------------------------------
+
+if [[ -z "${model}" ]]; then
+    echo "Model is required"
+    exit 1
+fi
+
+phonetisaurus_args=('--model' "${model}")
+vocab_g2p_args=()
+
+if [[ ! -z "${nbest}" ]]; then
+    phonetisaurus_args+=('--nbest' "${nbest}")
+fi
+
+if [[ ! -z "${debug}" ]]; then
+    vocab_g2p_args+=('--debug')
+fi
+
+if [[ ! -z "${output}" ]]; then
+    vocab_g2p_args+=('--output' "${output}")
+fi
 
 # -----------------------------------------------------------------------------
 
-temp_list="$(mktemp)"
-function finish {
-    rm -f "${temp_list}"
-}
+if [[ -z "${unknown}" ]]; then
+    # Use temporary file and stdin
+    unknown="$(mktemp)"
+    function finish {
+        rm -f "${unknown}"
+    }
 
-trap finish EXIT
+    trap finish EXIT
+
+    cat > "${unknown}"
+fi
+
+phonetisaurus_args+=('--word_list' "${unknown}")
 
 # -----------------------------------------------------------------------------
 
-cat > "${temp_list}"
-phonetisaurus-apply --word_list "${temp_list}" "$@" | \
-    python3 -m training.vocab_g2p
+phonetisaurus-apply "${phonetisaurus_args[@]}" | \
+    python3 -m training.vocab_g2p "${vocab_g2p_args[@]}"

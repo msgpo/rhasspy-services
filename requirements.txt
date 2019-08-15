@@ -6,3 +6,4 @@ webrtcvad
 pyinstaller
 paho-mqtt
 networkx
+doit

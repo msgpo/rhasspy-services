@@ -21,6 +21,11 @@ def main():
     )
     parser.add_argument("--unknown", help="Path to write unknown words", default=None)
     parser.add_argument(
+        "--output",
+        help="Path to write custom dictionary (default: stdout)",
+        default=None,
+    )
+    parser.add_argument(
         "--upper", action="store_true", help="Force upper-case on all words"
     )
     parser.add_argument(
@@ -37,10 +42,14 @@ def main():
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
+    output_file = sys.stdout
+    if args.output:
+        output_file = open(args.output, "w")
+
     unknown_words = make_dict(
         args.vocab,
         args.dictionary,
-        sys.stdout,
+        output_file,
         unknown_path=args.unknown,
         upper=args.upper,
         lower=args.lower,
@@ -50,6 +59,7 @@ def main():
     if (len(unknown_words) > 0) and (args.unknown is None):
         logging.fatal("Unknown words: %s" % ", ".join(unknown_words))
         sys.exit(1)
+
 
 # -----------------------------------------------------------------------------
 

@@ -2,3 +2,4 @@ pyyaml
 pydash
 jsgf2fst==0.1.2
 jsonlines
+doit

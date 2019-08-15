@@ -25,3 +25,4 @@ docs/notebooks/wav_files.txt
 
 supervisord.log
 supervisord.pid
+.doit.db
