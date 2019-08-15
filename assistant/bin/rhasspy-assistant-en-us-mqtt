@@ -69,7 +69,7 @@ fi
 # -----------------------------------------------------------------------------
 
 echo "Training..." > /dev/stderr
-rhasspy-train-profile --profile "${profile_dir}" --debug
+rhasspy-train --profile "${profile_dir}" --debug
 
 # -----------------------------------------------------------------------------
 # Run assistant

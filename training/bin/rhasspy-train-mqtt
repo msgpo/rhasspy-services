@@ -102,57 +102,62 @@ function send_event {
 set +e
 
 # Main loop
-mosquitto_sub -v -t "${mqtt_topic}" | while read -r topic payload;
-do
-    # Split topic by /
-    IFS='/'; read -ra topic_parts <<< "${topic}"
-    IFS='/'; base_topic="${topic_parts[*]:0:3}"
-    IFS='/'; request_id="${topic_parts[*]:3}"
+mosquitto_sub -v -t "${mqtt_topic}" | \
+    while read -r topic payload;
+    do
+        # Split topic by /
+        IFS='/'
+        read -ra topic_parts <<< "${topic}"
+        base_topic="${topic_parts[*]:0:3}"
+        request_id="${topic_parts[*]:3}"
 
-    if [[ ! -z "${request_id}" ]]; then
-        request_id="/${request_id}"
-    fi
+        # Need to restore this
+        IFS=' '
 
-    if [[ "${base_topic}" == "${event_start}" ]]; then
-        echo "Training started (request_id=${request_id})"
-        (
-            send_event "${event_started}${request_id}"
+        if [[ ! -z "${request_id}" ]]; then
+            request_id="/${request_id}"
+        fi
 
-            # Do actual training
-            (rhasspy-train \
-                 --profile "${profile_dir}" \
-                 2>&1 | \
-                 tee /dev/stderr \
-                     > "${error_file}") || exit 1
+        if [[ "${base_topic}" == "${event_start}" ]]; then
+            echo "Training started (request_id=${request_id})"
+            (
+                send_event "${event_started}${request_id}"
 
-            # Check for unknown words
-            if [[ ! -f "${unknown}" ]]; then
-                # Success
-                echo "Training complete"
-                send_event "${event_completed}${request_id}"
-            else
-                # Handle unknown words
-                echo "Unknown words:"
-                cat "${unknown}"
-                echo ''
+                # Do actual training
+                (rhasspy-train \
+                     --profile "${profile_dir}" \
+                     2>&1 | \
+                     tee /dev/stderr \
+                         > "${error_file}") || exit 1
 
-                if [[ -f "${guess}" ]]; then
-                    # Report guessed pronunciations
-                    jq -jcn \
-                    --argjson guess "$(cat "${guess}")" \
-                    '{ "error": "unknown words", "unknown_words":$guess }' | \
-                        send_event "${event_error}${request_id}" '-'
+                # Check for unknown words
+                if [[ ! -f "${unknown}" ]]; then
+                    # Success
+                    echo "Training complete"
+                    send_event "${event_completed}${request_id}"
                 else
-                    # Simply report unknown words
-                    error_message='unknown words'
-                    exit 1
+                    # Handle unknown words
+                    echo "Unknown words:"
+                    cat "${unknown}"
+                    echo ''
+
+                    if [[ -f "${guess}" ]]; then
+                        # Report guessed pronunciations
+                        jq -jcn \
+                           --argjson guess "$(cat "${guess}")" \
+                           '{ "error": "unknown words", "unknown_words":$guess }' | \
+                            send_event "${event_error}${request_id}" '-'
+                    else
+                        # Simply report unknown words
+                        error_message='unknown words'
+                        exit 1
+                    fi
                 fi
-            fi
-        ) || (
-            # Report general errors
-            error_message="$(cat "${error_file}")"
-            jq -jcn --arg m "${error_message}" '{error:$m}' | \
-                send_event "${event_error}${request_id}" '-'
-        )
-    fi
-done
+            ) || (
+                # Report general errors
+                error_message="$(cat "${error_file}")"
+                jq -jcn --arg m "${error_message}" '{error:$m}' | \
+                    send_event "${event_error}${request_id}" '-'
+            )
+        fi
+    done

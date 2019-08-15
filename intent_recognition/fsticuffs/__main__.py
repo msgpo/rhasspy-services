@@ -141,7 +141,9 @@ def main():
             base_topic = "/".join(topic_parts[:3])
 
             # Everything after base topic is request id
-            request_id = "/" + "/".join(topic_parts[3:])
+            request_id = "/".join(topic_parts[3:])
+            if len(request_id) > 0:
+                request_id = "/" + request_id
 
             if base_topic == EVENT_RECOGNIZE:
                 event_dict = maybe_object(event)
