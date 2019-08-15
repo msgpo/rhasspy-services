@@ -17,6 +17,7 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 # MQTT
 DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+DEFINE_string 'mqtt-topic' 'rhasspy/training/#' 'MQTT topic to subscribe to'
 
 # Events
 DEFINE_string 'start-training' 'rhasspy/training/start-training' 'Topic for re-training request'
@@ -36,14 +37,11 @@ profile_dir="${FLAGS_profile}"
 
 mqtt_host="${FLAGS_mqtt_host}"
 mqtt_port="${FLAGS_mqtt_port}"
+mqtt_topic="${FLAGS_mqtt_topic}"
 
 if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
     debug='--debug'
 fi
-
-start_training="${FLAGS_start_training}"
-training_failed="${FLAGS_training_failed}"
-training_complete="${FLAGS_training_complete}"
 
 # -----------------------------------------------------------------------------
 # Profile
@@ -58,6 +56,7 @@ export profile_dir="$(realpath "${profile_dir}")"
 source <(rhasspy-yq "${profile_dir}/profile.yml" \
                     -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                     -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                    -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
                     -q unknown 'training.unknown-words-file' "${profile_dir}/unknown.txt" \
                     -q guess 'training.guess-words-file' "${profile_dir}/guess_words.json" | \
              tee /dev/stderr)
@@ -72,48 +71,88 @@ function finish {
 trap finish EXIT
 
 # -----------------------------------------------------------------------------
+# MQTT Events
+# -----------------------------------------------------------------------------
+
+event_prefix='rhasspy/training'
+
+# Input
+event_start="${event_prefix}/start-training"
+
+# Output
+event_error="${event_prefix}/error"
+event_started="${event_prefix}/training-started"
+event_completed="${event_prefix}/training-completed"
+
+function send_event {
+    topic="$1"
+    payload="$2"
+    if [[ -z "${payload}" ]]; then
+        payload='{}'
+    elif [[ "${payload}" == '-' ]]; then
+        payload="$(cat)"
+    fi
+
+    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"
+}
+
+# -----------------------------------------------------------------------------
 
 # Disable automatic exiting on error
 set +e
 
 # Main loop
-mosquitto_sub -v -t "${start_training}" | while read -r line;
+mosquitto_sub -v -t "${mqtt_topic}" | while read -r topic payload;
 do
-    echo "Training started"
-    (
-        # Do actual training
-        rhasspy-train \
-            --profile "${profile_dir}" \
-            2>&1 > "${error_file}" || exit 1
+    # Split topic by /
+    IFS='/'; read -ra topic_parts <<< "${topic}"
+    IFS='/'; base_topic="${topic_parts[*]:0:3}"
+    IFS='/'; request_id="${topic_parts[*]:3}"
 
-        # Check for unknown words
-        if [[ ! -f "${unknown}" ]]; then
-            # Success
-            echo "Training complete"
-            mosquitto_pub -t "${training_complete}" -m '{}'
-        else
-            # Handle unknown words
-            echo "Unknown words:"
-            cat "${unknown}"
-            echo ''
+    if [[ ! -z "${request_id}" ]]; then
+        request_id="/${request_id}"
+    fi
 
-            if [[ -f "${guess}" ]]; then
-                # Report guessed pronunciations
-                jq -jcn \
-                   --argjson guess "$(cat "${guess}")" \
-                   '{ "error": "unknown words", "unknown_words":$guess }' | \
-                    mosquitto_pub -t "${training_failed}" -s
+    if [[ "${base_topic}" == "${event_start}" ]]; then
+        echo "Training started (request_id=${request_id})"
+        (
+            send_event "${event_started}${request_id}"
+
+            # Do actual training
+            (rhasspy-train \
+                 --profile "${profile_dir}" \
+                 2>&1 | \
+                 tee /dev/stderr \
+                     > "${error_file}") || exit 1
+
+            # Check for unknown words
+            if [[ ! -f "${unknown}" ]]; then
+                # Success
+                echo "Training complete"
+                send_event "${event_completed}${request_id}"
             else
-                # Simply report unknown words
-                error_message='unknown words'
-                exit 1
+                # Handle unknown words
+                echo "Unknown words:"
+                cat "${unknown}"
+                echo ''
+
+                if [[ -f "${guess}" ]]; then
+                    # Report guessed pronunciations
+                    jq -jcn \
+                    --argjson guess "$(cat "${guess}")" \
+                    '{ "error": "unknown words", "unknown_words":$guess }' | \
+                        send_event "${event_error}${request_id}" '-'
+                else
+                    # Simply report unknown words
+                    error_message='unknown words'
+                    exit 1
+                fi
             fi
-        fi
-    ) || (
-        # Report general errors
-        stat "${error_file}"
-        error_message="$(cat "${error_file}")"
-        jq -jcn --arg m "${error_message}" '{error:$m}' | \
-            mosquitto_pub -t "${training_failed}" -s
-    )
+        ) || (
+            # Report general errors
+            error_message="$(cat "${error_file}")"
+            jq -jcn --arg m "${error_message}" '{error:$m}' | \
+                send_event "${event_error}${request_id}" '-'
+        )
+    fi
 done
