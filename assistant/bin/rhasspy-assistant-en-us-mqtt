@@ -19,6 +19,9 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 # supervisord
 DEFINE_string 'supervisord-conf' '' 'Path to supervisord conf file'
 
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
 # -----------------------------------------------------------------------------
 # Default Settings
 # -----------------------------------------------------------------------------
@@ -31,7 +34,6 @@ supervisord_conf="${FLAGS_supervisord_conf}"
 
 if [[ -z "${supervisord_conf}" ]]; then
     supervisord_conf="${rhasspy_dir}/assistant/${rhasspy_lang}.supervisord.conf"
-    echo "Using ${supervisord_conf}" > /dev/stderr
 fi
 
 # -----------------------------------------------------------------------------
@@ -69,7 +71,8 @@ fi
 # -----------------------------------------------------------------------------
 
 echo "Training..." > /dev/stderr
-rhasspy-train --profile "${profile_dir}" --debug
+rhasspy-train \
+    --profile "${profile_dir}" --debug
 
 # -----------------------------------------------------------------------------
 # Run assistant
@@ -78,5 +81,9 @@ rhasspy-train --profile "${profile_dir}" --debug
 export log_dir="${profile_dir}/logs"
 rm -rf "${log_dir}"
 mkdir -p "${log_dir}"
+
+echo "Using ${supervisord_conf}" > /dev/stderr
+
+# -----------------------------------------------------------------------------
 
 supervisord -c "${supervisord_conf}"

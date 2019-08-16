@@ -2,12 +2,16 @@
 import os
 import re
 import argparse
+import logging
 from pathlib import Path
 
 import yaml
 import pydash
 import doit
 from doit import create_after
+
+logger = logging.getLogger("rhasspy_train")
+logging.basicConfig(level=logging.DEBUG)
 
 # -----------------------------------------------------------------------------
 
@@ -23,8 +27,8 @@ yaml.SafeLoader.add_constructor("!env", env_constructor)
 
 # Profile directory
 profile_dir = Path(os.getenv("profile_dir", os.getcwd()))
-os.environ["profile_dir"] = str(profile_dir)
-
+os.putenv("profile_dir", str(profile_dir))
+logger.debug(f"Profile at {profile_dir}")
 
 # Load profile
 profile_yaml = profile_dir / "profile.yml"
@@ -67,7 +71,7 @@ def task_grammars():
     return {
         "file_dep": [sentences_ini],
         "targets": [
-            grammar_dir / f"{intent}.gram" for intent in _get_intents("sentences.ini")
+            grammar_dir / f"{intent}.gram" for intent in _get_intents(sentences_ini)
         ],
         "actions": [
             [
@@ -85,7 +89,7 @@ def task_grammars():
 @create_after(executed="grammars")
 def task_fst_arpa():
     """Transforms intent JSGF grammars into single intent.fst and ARPA language model."""
-    intents = list(_get_intents("sentences.ini"))
+    intents = list(_get_intents(sentences_ini))
     return {
         "file_dep": [grammar_dir / f"{intent}.gram" for intent in intents]
         + list(slots_dir.glob("*")),

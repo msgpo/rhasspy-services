@@ -46,7 +46,12 @@ RUN apt-get update && \
         swig \
         netcat \
         jq \
-        sox
+        sox \
+        supervisor \
+        pulseaudio \
+        gstreamer1.0-pulseaudio \
+        gstreamer1.0-tools \
+        gstreamer1.0-plugins-good
 
 # Copy pre-built artifacts
 COPY --from=builder /build/bin/* /usr/bin/
@@ -62,6 +67,14 @@ RUN ln -s /usr/lib/libfstfarscript.so /usr/lib/libfstfarscript.so.13 && \
     ln -s /usr/lib/libsphinxbase.so /usr/lib/libsphinxbase.so.3
 
 # -----------------------------------------------------------------------------
+
+ENV rhasspy_dir=/usr/lib/rhasspy
+ENV rhasspy_lang=en-us
+
+COPY bin/rhasspy-* /usr/bin/
+COPY etc/shflags ${rhasspy_dir}/etc/
+
+# -----------------------------------------------------------------------------
 # Training
 # -----------------------------------------------------------------------------
 
@@ -72,38 +85,35 @@ RUN python3 -m pip install --no-cache-dir download/jsgf2fst-0.1.2.tar.gz
 COPY training/requirements.txt /requirements.training.txt
 RUN python3 -m pip install --no-cache-dir -r /requirements.training.txt
 
-COPY bin/rhasspy-yq /usr/bin/
-COPY etc/shflags /usr/lib/rhasspy/etc/
-
 # ini_jsgf
 COPY training/ini_jsgf/__init__.py training/ini_jsgf/__main__.py \
-     /usr/lib/rhasspy/training/ini_jsgf/
+     ${rhasspy_dir}/training/ini_jsgf/
 
-COPY training/ini_jsgf/ini_jsgf /usr/lib/rhasspy/training/ini_jsgf/ini_jsgf/
+COPY training/ini_jsgf/ini_jsgf ${rhasspy_dir}/training/ini_jsgf/ini_jsgf/
 COPY training/ini_jsgf/bin/rhasspy-ini_jsgf /usr/bin/
 
 # jsgf_fst_arpa
 COPY training/jsgf_fst_arpa/__init__.py training/jsgf_fst_arpa/__main__.py \
-     /usr/lib/rhasspy/training/jsgf_fst_arpa/
+     ${rhasspy_dir}/training/jsgf_fst_arpa/
 
-COPY training/jsgf_fst_arpa/jsgf_fst_arpa /usr/lib/rhasspy/training/jsgf_fst_arpa/jsgf_fst_arpa/
+COPY training/jsgf_fst_arpa/jsgf_fst_arpa ${rhasspy_dir}/training/jsgf_fst_arpa/jsgf_fst_arpa/
 COPY training/jsgf_fst_arpa/bin/rhasspy-jsgf_fst_arpa /usr/bin/
 
 # vocab_dict
 COPY training/vocab_dict/__init__.py training/vocab_dict/__main__.py \
-     /usr/lib/rhasspy/training/vocab_dict/
+     ${rhasspy_dir}/training/vocab_dict/
 
-COPY training/vocab_dict/vocab_dict /usr/lib/rhasspy/training/vocab_dict/vocab_dict/
+COPY training/vocab_dict/vocab_dict ${rhasspy_dir}/training/vocab_dict/vocab_dict/
 COPY training/vocab_dict/bin/rhasspy-vocab_dict /usr/bin/
 
 # vocab_g2p
 COPY training/vocab_g2p/__init__.py training/vocab_g2p/__main__.py \
-     /usr/lib/rhasspy/training/vocab_g2p/
+     ${rhasspy_dir}/training/vocab_g2p/
 
 COPY training/vocab_g2p/bin/rhasspy-vocab_g2p  /usr/bin/
 
 # train
-COPY training/__init__.py /usr/lib/rhasspy/training/
+COPY training/__init__.py ${rhasspy_dir}/training/
 COPY training/bin/rhasspy-*  /usr/bin/
 
 # pronounce
@@ -120,18 +130,18 @@ COPY speech_to_text/pocketsphinx/requirements.txt /requirements.pocketsphinx.txt
 RUN python3 -m pip install --no-cache-dir -r /requirements.pocketsphinx.txt
 
 COPY bin/rhasspy-yq /usr/bin/
-COPY etc/shflags /usr/lib/rhasspy/etc/
+COPY etc/shflags ${rhasspy_dir}/etc/
 
 COPY speech_to_text/pocketsphinx/bin/rhasspy-* /usr/bin/
 
 COPY speech_to_text/pocketsphinx/__init__.py speech_to_text/pocketsphinx/__main__.py \
-     /usr/lib/rhasspy/speech_to_text/pocketsphinx/
+     ${rhasspy_dir}/speech_to_text/pocketsphinx/
 
 COPY speech_to_text/pocketsphinx/http_server/ \
-     /usr/lib/rhasspy/speech_to_text/pocketsphinx/http_server/
+     ${rhasspy_dir}/speech_to_text/pocketsphinx/http_server/
 
 COPY speech_to_text/pocketsphinx/pocketsphinx_rhasspy/ \
-     /usr/lib/rhasspy/speech_to_text/pocketsphinx/pocketsphinx_rhasspy/
+     ${rhasspy_dir}/speech_to_text/pocketsphinx/pocketsphinx_rhasspy/
 
 # -----------------------------------------------------------------------------
 # Intent Recognition
@@ -140,22 +150,17 @@ COPY speech_to_text/pocketsphinx/pocketsphinx_rhasspy/ \
 COPY download/jsgf2fst-0.1.2.tar.gz /download/
 RUN python3 -m pip install --no-cache-dir download/jsgf2fst-0.1.2.tar.gz
 
-ARG PY_DIR=intent_recognition/fsticuffs
-
 COPY intent_recognition/fsticuffs/requirements.txt /requirements.fsticuffs.txt
 RUN python3 -m pip install --no-cache-dir -r /requirements.fsticuffs.txt
-
-COPY bin/rhasspy-yq /usr/bin/
-COPY etc/shflags /usr/lib/rhasspy/etc/
 
 COPY intent_recognition/fsticuffs/bin/rhasspy-* /usr/bin/
 
 COPY intent_recognition/fsticuffs/__init__.py \
      intent_recognition/fsticuffs/__main__.py \
-     /usr/lib/rhasspy/intent_recognition/fsticuffs/
+     ${rhasspy_dir}/intent_recognition/fsticuffs/
 
 COPY intent_recognition/fsticuffs/fsticuffs \
-     /usr/lib/rhasspy/intent_recognition/fsticuffs/fsticuffs/
+     ${rhasspy_dir}/intent_recognition/fsticuffs/fsticuffs/
 
 # -----------------------------------------------------------------------------
 # Voice Command
@@ -164,16 +169,13 @@ COPY intent_recognition/fsticuffs/fsticuffs \
 COPY voice_command/webrtcvad/requirements.txt /requirements.webrtcvad.txt
 RUN python3 -m pip install --no-cache-dir -r requirements.webrtcvad.txt
 
-COPY bin/rhasspy-yq /usr/bin/
-COPY etc/shflags /usr/lib/rhasspy/etc/
-
 COPY voice_command/webrtcvad/bin/rhasspy-* /usr/bin/
 
 COPY voice_command/webrtcvad/__init__.py voice_command/webrtcvad/__main__.py \
-     /usr/lib/rhasspy/voice_command/webrtcvad/
+     ${rhasspy_dir}/voice_command/webrtcvad/
 
 COPY voice_command/webrtcvad/webrtcvad_rhasspy \
-     /usr/lib/rhasspy/voice_command/webrtcvad/webrtcvad_rhasspy/
+     ${rhasspy_dir}/voice_command/webrtcvad/webrtcvad_rhasspy/
 
 # -----------------------------------------------------------------------------
 # Wake Word
@@ -182,32 +184,71 @@ COPY voice_command/webrtcvad/webrtcvad_rhasspy \
 COPY wake_word/porcupine/requirements.txt /requirements.porcupine.txt
 RUN python3 -m pip install --no-cache-dir -r requirements.porcupine.txt
 
-COPY bin/rhasspy-yq /usr/bin/
-COPY etc/shflags /usr/lib/rhasspy/etc/
-
 COPY wake_word/porcupine/lib/x86_64/libpv_porcupine.so \
-     /usr/lib/rhasspy/wake_word/porcupine/lib/
+     ${rhasspy_dir}/wake_word/porcupine/lib/
 
 COPY wake_word/porcupine/lib/common/porcupine_params.pv \
-     /usr/lib/rhasspy/wake_word/porcupine/lib/common/
+     ${rhasspy_dir}/wake_word/porcupine/lib/common/
 
 COPY wake_word/porcupine/resources/keyword_files/linux/porcupine_linux.ppn \
-     /usr/lib/rhasspy/wake_word/porcupine/keyword_files/linux/
+     ${rhasspy_dir}/wake_word/porcupine/keyword_files/linux/
 
 COPY wake_word/porcupine/bin/rhasspy-* /usr/bin/
 
 COPY wake_word/porcupine/__init__.py wake_word/porcupine/__main__.py \
-     /usr/lib/rhasspy/wake_word/porcupine/
+     ${rhasspy_dir}/wake_word/porcupine/
 
 COPY wake_word/porcupine/porcupine_rhasspy \
-     /usr/lib/rhasspy/wake_word/porcupine/porcupine_rhasspy/
+     ${rhasspy_dir}/wake_word/porcupine/porcupine_rhasspy/
 
-ENV porcupine_library=/usr/lib/rhasspy/wake_word/porcupine/lib/libpv_porcupine.so
-ENV porcupine_model=/usr/lib/rhasspy/wake_word/porcupine/lib/common/porcupine_params.pv
-ENV porcupine_keyword=/usr/lib/rhasspy/wake_word/porcupine/keyword_files/linux/porcupine_linux.ppn
+ENV porcupine_library=${rhasspy_dir}/wake_word/porcupine/lib/libpv_porcupine.so
+ENV porcupine_model=${rhasspy_dir}/wake_word/porcupine/lib/common/porcupine_params.pv
+ENV porcupine_keyword=${rhasspy_dir}/wake_word/porcupine/keyword_files/linux/porcupine_linux.ppn
+
+# -----------------------------------------------------------------------------
+# Text to Speech
+# -----------------------------------------------------------------------------
+
+COPY text_to_speech/espeak/requirements.txt /requirements.espeak.txt
+RUN python3 -m pip install --no-cache-dir -r /requirements.espeak.txt
+
+COPY text_to_speech/espeak/bin/rhasspy-* /usr/bin/
+
+# -----------------------------------------------------------------------------
+# Language
+# -----------------------------------------------------------------------------
+
+COPY languages/english/en-us_pocketsphinx-cmu/ \
+     ${rhasspy_dir}/languages/english/en-us_pocketsphinx-cmu/
+
+# -----------------------------------------------------------------------------
+# User Interface
+# -----------------------------------------------------------------------------
+
+COPY user_interface/push-to-talk/ \
+     ${rhasspy_dir}/user_interface/push-to-talk/
+
+COPY user_interface/push-to-talk/bin/rhasspy-* /usr/bin/
+
+# -----------------------------------------------------------------------------
+# Assistant
+# -----------------------------------------------------------------------------
+
+COPY assistant/bin/rhasspy-* /usr/bin/
+COPY assistant/${rhasspy_lang}.supervisord.conf ${rhasspy_dir}/assistant/
+
+# -----------------------------------------------------------------------------
+# Audio Input/Output
+# -----------------------------------------------------------------------------
+
+COPY docker/assistant/pulseaudio.client.conf /etc/pulse/client.conf
+
+COPY audio_input/pulseaudio/bin/rhasspy-* \
+     audio_output/pulseaudio/bin/rhasspy-* \
+     /usr/bin/
 
 # -----------------------------------------------------------------------------
 
-ENV PYTHONPATH=/usr/lib/rhasspy
+ENV PYTHONPATH=${rhasspy_dir}
 
 ENTRYPOINT ["bash"]

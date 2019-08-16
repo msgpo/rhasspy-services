@@ -78,7 +78,7 @@ if [[ ! -z "${debug}" ]]; then
     echo "Expecting UDP audio stream at ${audio_host}:${audio_port}"
 fi
 
-nc -ukl "${audio_host}" "${audio_port}" | \
+nc -ukl "${audio_host}" -p "${audio_port}" | \
     rhasspy-webrtcvad \
         "${args[@]}" \
         --events-in-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}") | \

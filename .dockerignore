@@ -34,6 +34,7 @@
 !wake_word/porcupine/porcupine_rhasspy/*.py
 
 # espeak
+!text_to_speech/espeak/requirements.txt
 !text_to_speech/espeak/bin/
 
 # training
@@ -62,6 +63,21 @@
 !voice_command/webrtcvad/*.py
 !voice_command/webrtcvad/bin/
 !voice_command/webrtcvad/webrtcvad_rhasspy/*.py
+
+# languages
+!languages/english/en-us_pocketsphinx-cmu/
+
+# user_interface
+!user_interface/push-to-talk/
+
+# assistant
+!assistant/bin/
+!assistant/*.conf
+!docker/assistant/
+
+# audio
+!audio_input/pulseaudio/bin/
+!audio_output/pulseaudio/bin/
 
 # multiarch
 !docker/multiarch_build/

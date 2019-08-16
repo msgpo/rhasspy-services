@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+docker run -it \
+       -u "$(id -u):$(id -g)" \
+       -e "HOME=${HOME}" \
+       -v "${HOME}:${HOME}" \
+       -v /etc/localtime:/etc/localtime:ro \
+       -v "/run/user/$(id -u)/pulse:/run/user/1000/pulse" \
+       -v "${HOME}/.config/pulse/cookie:/home/rhasspy/.config/pulse/cookie" \
+       -w "${PWD}" \
+       --network host \
+       --entrypoint rhasspy-assistant-en-us-mqtt \
+       rhasspy/assistant/en-us \
+       "$@"

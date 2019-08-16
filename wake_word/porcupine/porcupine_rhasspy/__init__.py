@@ -102,13 +102,14 @@ def wait_for_wake_word(
                                 if len(keyword) == 1:
                                     keyword_index = 0
 
-                                logger.debug(f"Keyword {keyword_index} detected")
-                                result = {
-                                    "index": keyword_index,
-                                    "keyword": keyword[keyword_index],
-                                }
+                                if keyword_index >= 0:
+                                    logger.debug(f"Keyword {keyword_index} detected")
+                                    result = {
+                                        "index": keyword_index,
+                                        "keyword": keyword[keyword_index],
+                                    }
 
-                                send_event(EVENT_DETECTED + request_id, result)
+                                    send_event(EVENT_DETECTED + request_id, result)
                     else:
                         # Prevent 100% CPU usage
                         time.sleep(0.01)

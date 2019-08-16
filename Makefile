@@ -16,6 +16,7 @@
         docker-porcupine \
         docker-pulseaudio-input \
         docker-pulseaudio-output \
+        docker-push-to-talk \
         docker-webrtcvad \
         installer-fsticuffs \
         installer-kaldi \
@@ -60,6 +61,9 @@ docker-pulseaudio-input:
 
 docker-pulseaudio-output:
 	docker build . -f docker/audio_output/pulseaudio/Dockerfile -t rhasspy/audio-output/pulseaudio
+
+docker-push-to-talk:
+	docker build . -f docker/user_interface/push-to-talk/Dockerfile -t rhasspy/user_interface/push-to-talk
 
 docker-webrtcvad:
 	docker build . -f docker/voice_command/webrtcvad//Dockerfile -t rhasspy/voice-command/webrtcvad
