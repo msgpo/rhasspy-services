@@ -62,3 +62,6 @@
 !voice_command/webrtcvad/*.py
 !voice_command/webrtcvad/bin/
 !voice_command/webrtcvad/webrtcvad_rhasspy/*.py
+
+# multiarch
+!docker/multiarch_build/

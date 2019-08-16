@@ -27,6 +27,7 @@
 
 # -----------------------------------------------------------------------------
 
+CPU_ARCH ?= x86_64
 FRIENDLY_ARCH ?= amd64
 
 # -----------------------------------------------------------------------------
@@ -138,3 +139,14 @@ debian-utils: installer-utils
 
 debian-webrtcvad: installer-webrtcvad
 	bash debianize.sh voice_command webrtcvad $(FRIENDLY_ARCH)
+
+# -----------------------------------------------------------------------------
+# Multi-Arch Builds
+# -----------------------------------------------------------------------------
+
+docker-multiarch-build:
+	docker build . -f docker/multiarch_build/Dockerfile.debian \
+    --build-arg BUILD_ARCH=armhf \
+    --build-arg CPU_ARCH=armv7l \
+    --build-arg BUILD_FROM=arm32v7/python:3.6-slim-stretch \
+    -t rhasspy/multi-arch/build
