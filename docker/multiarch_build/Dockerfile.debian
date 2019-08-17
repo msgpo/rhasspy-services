@@ -1,17 +1,59 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
+ARG MAKE_THREADS=8
 ARG BUILD_ARCH
 ARG CPU_ARCH
+
 ENV LANG C.UTF-8
 
 COPY docker/multiarch_build/bin/qemu-* /usr/bin/
 
 RUN apt-get update && \
     apt-get install -y \
+        build-essential \
+        autoconf automake libtool \
+        bison swig \
         libssl-dev libacl1-dev liblz4-dev libfuse-dev fuse pkg-config \
         fakeroot build-essential wget \
-        zlib1g-dev libbz2-dev libncurses5-dev libreadline-dev liblzma-dev libsqlite3-dev
+        zlib1g-dev libbz2-dev libncurses5-dev \
+        libreadline-dev liblzma-dev libsqlite3-dev
+
+COPY download/ /
+
+# openfst
+RUN tar -xf /openfst-1.6.9.tar.gz && \
+    cd /openfst-1.6.9 && \
+    ./configure --prefix=/build --enable-far --enable-static --enable-shared --enable-ngram-fsts && \
+    make -j $MAKE_THREADS && \
+    make install
+
+# opengrm
+COPY download/opengrm-ngram-1.3.4.tar.gz /
+RUN  tar -xf /opengrm-ngram-1.3.4.tar.gz && \
+     cd /opengrm-ngram-1.3.4 && \
+     CXXFLAGS=-I/build/include LDFLAGS=-L/build/lib ./configure --prefix=/build && \
+     make -j $MAKE_THREADS && \
+     make install
+
+
+# phonetisaurus
+COPY download/phonetisaurus-2019.tar.gz /
+RUN tar -xf phonetisaurus-2019.tar.gz && \
+    cd /phonetisaurus && \
+    ./configure --prefix=/build --with-openfst-includes=/build/include --with-openfst-libs=/build/lib && \
+    make -j $MAKE_THREADS && \
+    make install
+
+# sphinxbase
+COPY download/sphinxbase.tar.gz /
+RUN tar -xf /sphinxbase.tar.gz && \
+    cd /sphinxbase-master && \
+    ./autogen.sh --prefix=/build && \
+    make -j $MAKE_THREADS && \
+    make install
+
+# -----------------------------------------------------------------------------
 
 RUN cd / && \
     wget https://github.com/pyinstaller/pyinstaller/releases/download/v3.5/PyInstaller-3.5.tar.gz && \
@@ -23,19 +65,15 @@ RUN cd /PyInstaller-3.5/bootloader && \
 RUN cd /PyInstaller-3.5 && \
     python3 -m pip install -e .
 
-RUN apt-get install -y \
-    subversion \
-    autoconf automake libtool \
-    bison swig \
-    curl \
-    sphinxbase-utils
+# -----------------------------------------------------------------------------
 
-COPY install.sh /rhasspy/
+RUN apt-get install -y curl
+
 COPY etc/shflags /rhasspy/etc/
 COPY etc/kaldi/ /rhasspy/etc/kaldi/
-COPY download/ /rhasspy/download/
 
+COPY requirements.txt /rhasspy/
 RUN cd /rhasspy && \
-    bash install.sh --no-create --no-runtime
+    python3 -m pip install -r requirements.txt
 
 ENTRYPOINT ["bash"]

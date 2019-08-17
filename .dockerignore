@@ -7,6 +7,7 @@
 !etc/shflags
 !etc/kaldi/
 !install.sh
+!requirements.txt
 
 # fsticuffs
 !intent_recognition/fsticuffs/requirements.txt

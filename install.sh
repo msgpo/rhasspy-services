@@ -117,7 +117,7 @@ if [[ -z "$(which curl)" ]]; then
 fi
 
 # subversion (needed by kaldi for some dumb reason)
-if [[ -z "$(which svn)" ]]; then
+if [[ -z "${no_kaldi}" &&  -z "$(which svn)" ]]; then
     echo "Installing subversion"
     install subversion
 fi
