@@ -68,6 +68,11 @@ def main():
         default=None,
     )
     parser.add_argument(
+        "--text-input",
+        action="store_true",
+        help="Input is text instead of events + JSON",
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
 
@@ -135,8 +140,13 @@ def main():
         logger.debug(line)
 
         try:
-            # Expected <topic> <payload> on each line
-            topic, event = line.split(" ", maxsplit=1)
+            if args.text_input:
+                topic = EVENT_RECOGNIZE
+                event = json.dumps({ "text": line })
+            else:
+                # Expected <topic> <payload> on each line
+                topic, event = line.split(" ", maxsplit=1)
+
             topic_parts = topic.split("/")
             base_topic = "/".join(topic_parts[:3])
 

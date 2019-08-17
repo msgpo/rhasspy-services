@@ -80,6 +80,7 @@ openfst_dir="${kaldi_dir}/tools/openfst"
 touch "${model_dir}/path.sh"
 
 # Link utils
+rm -rf "${model_dir}/utils"
 ln -fs "${utils_dir}" "${model_dir}/utils"
 
 export PATH="${utils_dir}:${fstbin_dir}:${lmbin_dir}:${bin_dir}:${openfst_dir}/bin:$PATH"

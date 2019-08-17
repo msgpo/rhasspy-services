@@ -1,7 +1,6 @@
 jsonlines
 pyyaml
 pydash
-pocketsphinx
 webrtcvad
 pyinstaller
 paho-mqtt

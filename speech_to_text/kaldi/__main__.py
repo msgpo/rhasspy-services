@@ -162,7 +162,7 @@ def transcribe(
         temp_file.seek(0)
 
         kaldi_cmd = [
-            "kaldi-decode",
+            "rhasspy-kaldi-decode",
             "--kaldi-dir",
             kaldi_dir,
             "--model-dir",
