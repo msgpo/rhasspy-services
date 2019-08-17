@@ -1,17 +1,36 @@
 #!/usr/bin/env bash
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
 args=()
 if [[ ! -z "${porcupine_library}" ]]; then
     args+=('--library' "${porcupine_library}")
+else
+    # Look for libpv_porcupine.so in both the base Rhasspy directory
+    library_path='wake_word/porcupine/lib/x86_64/libpv_porcupine.so'
+    args+=('--library' "${rhasspy_dir}/${library_path}")
 fi
 
 if [[ ! -z "${porcupine_model}" ]]; then
     args+=('--model' "${porcupine_model}")
+else
+    # Look for porcupine_params.pv in the base Rhasspy directory
+    model_path='wake_word/porcupine/lib/common/porcupine_params.pv'
+    args+=('--model' "${rhasspy_dir}/${model_path}")
 fi
 
 if [[ ! -z "${porcupine_keyword}" ]]; then
     args+=('--keyword' "${porcupine_keyword}")
+else
+    # Look for porcupine_linux.ppn in the base Rhasspy directory
+    keyword_path='wake_word/porcupine/resources/keyword_files/linux/porcupine_linux.ppn'
+    args+=('--keyword' "${rhasspy_dir}/${keyword_path}")
 fi
 
 args+=("$@")
+
+# -----------------------------------------------------------------------------
 
 python3 -m wake_word.porcupine "${args[@]}"

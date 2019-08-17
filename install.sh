@@ -117,7 +117,7 @@ if [[ -z "$(which curl)" ]]; then
 fi
 
 # subversion (needed by kaldi for some dumb reason)
-if [[ -z "$(which svn)" ]]; then
+if [[ -z "${no_kaldi}" && -z "$(which svn)" ]]; then
     echo "Installing subversion"
     install subversion
 fi
@@ -345,7 +345,7 @@ if [[ ! -z "${no_kaldi}" || ! -d "${kaldi_dir}/build" ]]; then
         cd "${kaldi_dir}/tools" && \
         make -j "${make_threads}" && \
         cd "${kaldi_dir}/src" &&
-        ./configure --shared && \
+        ./configure --shared --mathlib=ATLAS && \
         make depend -j "${make_threads}" && \
         make -j "${make_threads}"
 fi

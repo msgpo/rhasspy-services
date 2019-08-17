@@ -32,6 +32,14 @@ RUN tar -xf phonetisaurus-2019.tar.gz && \
     make -j $MAKE_THREADS && \
     make install
 
+# sphinxbase
+RUN apt-get install -y swig
+COPY download/sphinxbase.tar.gz /
+RUN tar -xf /sphinxbase.tar.gz && \
+    cd /sphinxbase-master && \
+    ./autogen.sh --prefix=/build && \
+    make -j $MAKE_THREADS && \
+    make install
 # -----------------------------------------------------------------------------
 
 FROM python:3.6-slim-stretch
