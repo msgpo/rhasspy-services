@@ -23,4 +23,19 @@ RUN cd /PyInstaller-3.5/bootloader && \
 RUN cd /PyInstaller-3.5 && \
     python3 -m pip install -e .
 
+RUN apt-get install -y \
+    subversion \
+    autoconf automake libtool \
+    bison swig \
+    curl \
+    sphinxbase-utils
+
+COPY install.sh /rhasspy/
+COPY etc/shflags /rhasspy/etc/
+COPY etc/kaldi/ /rhasspy/etc/kaldi/
+COPY download/ /rhasspy/download/
+
+RUN cd /rhasspy && \
+    bash install.sh --no-create --no-runtime
+
 ENTRYPOINT ["bash"]

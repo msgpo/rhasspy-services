@@ -12,6 +12,7 @@ DEFINE_string 'download-dir' "${this_dir}/download" 'Directory to cache download
 DEFINE_string 'build-dir' "${this_dir}/build" 'Directory to build dependencies in'
 DEFINE_boolean 'no-create' false 'Do not re-create the virtual environment'
 DEFINE_boolean 'no-kaldi' false 'Do not install Kaldi speech recognizer'
+DEFINE_boolean 'no-runtime' false 'Only install packages needed for building'
 DEFINE_integer 'make-threads' 4 'Number of threads to use with make' 'j'
 
 FLAGS "$@" || exit $?
@@ -35,13 +36,17 @@ if [[ "${FLAGS_no_kaldi}" -eq "${FLAGS_TRUE}" ]]; then
     no_kaldi='true'
 fi
 
+if [[ "${FLAGS_no_runtime}" -eq "${FLAGS_TRUE}" ]]; then
+    no_runtime='true'
+fi
+
 make_threads="${FLAGS_make_threads}"
 
 mkdir -p "${download_dir}"
 mkdir -p "${build_dir}"
 
 # -----------------------------------------------------------------------------
-# Debian dependencies
+# Build Tools
 # -----------------------------------------------------------------------------
 
 function install {
@@ -105,46 +110,58 @@ if [[ -z "$(which swig)" ]]; then
     install swig
 fi
 
-# gstreamer
-if [[ -z "$(which gst-launch-1.0)" ]]; then
-    echo "Installing gstreamer"
-    install gstreamer1.0-pulseaudio gstreamer1.0-tools gstreamer1.0-plugins-good
-fi
-
-# mosquitto clients
-if [[ -z "$(which mosquitto_sub)" ]]; then
-    echo "Installing mosquitto clients"
-    install mosquitto-clients
-fi
-
-# netcat
-if [[ -z "$(which nc)" ]]; then
-    echo "Installing netcat"
-    install netcat
-fi
-
-# jq
-if [[ -z "$(which jq)" ]]; then
-    echo "Installing jq"
-    install jq
-fi
-
-# sox
-if [[ -z "$(which sox)" ]]; then
-    echo "Installing sox"
-    install sox
-fi
-
-# supervisord
-if [[ -z "$(which supervisord)" ]]; then
-    echo "Installing supervisord"
-    install supervisor
+# curl
+if [[ -z "$(which curl)" ]]; then
+    echo "Installing curl"
+    install curl
 fi
 
 # subversion (needed by kaldi for some dumb reason)
 if [[ -z "$(which svn)" ]]; then
     echo "Installing subversion"
     install subversion
+fi
+
+# -----------------------------------------------------------------------------
+# Runtime Tools
+# -----------------------------------------------------------------------------
+
+if [[ -z "${no_runtime}" ]]; then
+    # gstreamer
+    if [[ -z "$(which gst-launch-1.0)" ]]; then
+        echo "Installing gstreamer"
+        install gstreamer1.0-pulseaudio gstreamer1.0-tools gstreamer1.0-plugins-good
+    fi
+
+    # mosquitto clients
+    if [[ -z "$(which mosquitto_sub)" ]]; then
+        echo "Installing mosquitto clients"
+        install mosquitto-clients
+    fi
+
+    # netcat
+    if [[ -z "$(which nc)" ]]; then
+        echo "Installing netcat"
+        install netcat
+    fi
+
+    # jq
+    if [[ -z "$(which jq)" ]]; then
+        echo "Installing jq"
+        install jq
+    fi
+
+    # sox
+    if [[ -z "$(which sox)" ]]; then
+        echo "Installing sox"
+        install sox
+    fi
+
+    # supervisord
+    if [[ -z "$(which supervisord)" ]]; then
+        echo "Installing supervisord"
+        install supervisor
+    fi
 fi
 
 # -----------------------------------------------------------------------------
@@ -162,6 +179,9 @@ if [[ -z "${no_create}" ]]; then
 elif [[ -d "${venv}" ]]; then
     echo "Using virtual environment at ${venv}"
     source "${venv}/bin/activate"
+else
+    echo "Not using a virtual environment"
+    venv='/usr'
 fi
 
 # -----------------------------------------------------------------------------
