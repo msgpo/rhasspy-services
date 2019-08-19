@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-install_dir='/usr/lib/rhasspy/porcupine'
+set -e
+
+if [[ -z "${rhasspy_dir} "]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+install_dir="${rhasspy_dir}/porcupine"
 export PATH="${install_dir}:${PATH}"
 export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
 
@@ -21,5 +27,7 @@ if [[ ! -z "${keyword}" ]]; then
 fi
 
 args+=("$@")
+
+# -----------------------------------------------------------------------------
 
 "${install_dir}/porcupine" "${args[@]}"

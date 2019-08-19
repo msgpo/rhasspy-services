@@ -81,7 +81,7 @@ fi
 nc -ukl "${audio_host}" -p "${audio_port}" | \
     rhasspy-webrtcvad \
         "${args[@]}" \
-        --events-in-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}") | \
+        --events-in-file <(rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}") | \
     while read -r topic payload;
     do
         mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"

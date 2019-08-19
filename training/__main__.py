@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import re
+import sys
 import argparse
 import logging
 from pathlib import Path
@@ -214,4 +215,13 @@ def _get_intents(ini_path):
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    # Monkey patch inspect to make doit work inside Pyinstaller.
+    # It grabs the line numbers of functions probably for debugging reasons, but
+    # PyInstaller doesn't seem to keep that information around.
+    #
+    # This better thing to do would be to create a custom TaskLoader.
+    import inspect
+    inspect.getsourcelines = lambda obj: [0, 0]
+
+    # Run doit main
     doit.run(globals())

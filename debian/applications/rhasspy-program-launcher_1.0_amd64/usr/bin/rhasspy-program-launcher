@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-rhasspy_lang='en-us'
 
 if [[ -z "${rhasspy_dir}" ]]; then
     export rhasspy_dir='/usr/lib/rhasspy'
 fi
-
-lang_full="${rhasspy_lang}_pocketsphinx-cmu"
-lang_dir="${rhasspy_dir}/languages/english/${lang_full}"
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
@@ -33,7 +29,7 @@ profile_dir="${FLAGS_profile}"
 supervisord_conf="${FLAGS_supervisord_conf}"
 
 if [[ -z "${supervisord_conf}" ]]; then
-    supervisord_conf="${rhasspy_dir}/assistant/${rhasspy_lang}.supervisord.conf"
+    supervisord_conf="${rhasspy_dir}/applications/program_launcher/supervisord.conf"
 fi
 
 # -----------------------------------------------------------------------------
@@ -42,47 +38,38 @@ fi
 
 if [[ -z "${profile_dir}" ]]; then
     if [[ -z "${XDG_CONFIG_HOME}" ]]; then
-        profile_dir="${HOME}/.config/rhasspy/${lang_full}"
+        profile_dir="${HOME}/.config/rhasspy/program_launcher"
     else
-        profile_dir="${XDG_CONFIG_HOME}/rhasspy/${lang_full}"
+        profile_dir="${XDG_CONFIG_HOME}/rhasspy/program_launcher"
     fi
 fi
 
 export profile_dir="$(realpath "${profile_dir}")"
 echo "Profile at ${profile_dir}" > /dev/stderr
-mkdir -p "${profile_dir}"
 
-# -----------------------------------------------------------------------------
-# Copy required files
-# -----------------------------------------------------------------------------
-
-if [[ ! -f "${profile_dir}/profile.yml" ]]; then
-    cp "${lang_dir}/profile.example.yml" "${profile_dir}/profile.yml"
-    echo "Using example profile.yml" > /dev/stderr
-fi
-
-if [[ ! -f "${profile_dir}/sentences.ini" ]]; then
-    cp "${lang_dir}/sentences.example.ini" "${profile_dir}/sentences.ini"
-    echo "Using example sentences. Training is required." > /dev/stderr
+if [[ ! -d "${profile_dir}" ]]; then
+    mkdir -p "${profile_dir}"
+    cp -R "${rhasspy_dir}/applications/program_launcher/profile/"* "${profile_dir}/"
 fi
 
 # -----------------------------------------------------------------------------
-# Train
+# Training
 # -----------------------------------------------------------------------------
 
-echo "Training..." > /dev/stderr
 rhasspy-train \
-    --profile "${profile_dir}" --debug
+    --profile "${profile_dir}" \
+    --debug
 
-# -----------------------------------------------------------------------------
-# Run assistant
-# -----------------------------------------------------------------------------
-
-export log_dir="${profile_dir}/logs"
-rm -rf "${log_dir}"
-mkdir -p "${log_dir}"
-
-echo "Using ${supervisord_conf}" > /dev/stderr
+unknown_words="${profile_dir}/unknown.txt"
+guess_words="${profile_dir}/guess_words.json"
+if [[ -f "${unknown_words}" ]]; then
+    echo "Exiting because of unknown words:"
+    cat "${unknown_words}"
+    echo ''
+    echo "Add correct pronunciation(s) to ${profile_dir}/custom_words.txt"
+    jq . < "${guess_words}"
+    exit 1
+fi
 
 # -----------------------------------------------------------------------------
 

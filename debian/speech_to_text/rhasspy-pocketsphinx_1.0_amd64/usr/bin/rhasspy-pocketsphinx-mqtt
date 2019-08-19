@@ -2,7 +2,9 @@
 
 # MQTT wrapper around rhasspy-pocketsphinx
 
-export rhasspy_dir='/usr/lib/rhasspy'
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
@@ -15,16 +17,11 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 # MQTT
 DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
+DEFINE_string 'mqtt-topic' 'rhasspy/speech-to-text/#' 'MQTT topic to subscribe to'
 
 # Microphone
 DEFINE_string 'audio-host' '0.0.0.0' 'Host for UDP audio input stream'
-DEFINE_integer 'audio-port' 5000 'Port for UDP audio input stream'
-
-# Events
-DEFINE_string 'start-listening' 'rhasspy/speech-to-text/start-listening' 'Topic to start listening to audio stream'
-DEFINE_string 'stop-listening' 'rhasspy/speech-to-text/stop-listening' 'Topic to stop listening to audio stream'
-DEFINE_string 'text-captured' 'rhasspy/speech-to-text/text-captured' 'Topic for transcription response'
-DEFINE_string 'reload' 'rhasspy/speech-to-text/reload' 'Topic for reload request'
+DEFINE_integer 'audio-port' 12202 'Port for UDP audio input stream'
 
 # pocketsphinx
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
@@ -45,6 +42,7 @@ profile_dir="${FLAGS_profile}"
 
 mqtt_host="${FLAGS_mqtt_host}"
 mqtt_port="${FLAGS_mqtt_port}"
+mqtt_topic="${FLAGS_mqtt_topic}"
 
 audio_host="${FLAGS_audio_host}"
 audio_port="${FLAGS_audio_port}"
@@ -57,30 +55,21 @@ acoustic_model="${FLAGS_acoustic_model}"
 language_model="${FLAGS_language_model}"
 dictionary="${FLAGS_dictionary}"
 
-start_listening="${FLAGS_start_listening}"
-stop_listening="${FLAGS_stop_listening}"
-text_captured="${FLAGS_text_captured}"
-reload="${FLAGS_reload}"
-
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_dir="$(realpath "${profile_dir}")"
-    export profile_dir
+    export profile_dir="$(realpath "${profile_dir}")"
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                         -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
                         -q audio_host 'speech-to-text.audio-input.host' "${audio_host}" \
                         -q audio_port 'speech-to-text.audio-input.port' "${audio_port}" \
                         -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \
                         -q language_model 'speech-to-text.pocketsphinx.language-model' "${language_model}" \
-                        -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}" \
-                        -q start_listening 'speech-to-text.mqtt-events.start-listening' "${start_listening}" \
-                        -q stop_listening 'speech-to-text.mqtt-events.stop-listening' "${stop_listening}" \
-                        -q text_captured 'speech-to-text.mqtt-events.text-captured' "${text_captured}" \
-                        -q reload 'speech-to-text.mqtt-events.reload' "${reload}" | \
+                        -q dictionary 'speech-to-text.pocketsphinx.dictionary' "${dictionary}" | \
                  tee /dev/stderr)
 fi
 
@@ -108,16 +97,12 @@ if [[ ! -z "${debug}" ]]; then
     echo "Expecting UDP audio stream at ${audio_host}:${audio_port}" > /dev/stderr
 fi
 
-nc -ukl "${audio_host}" "${audio_port}" | \
+nc -ukl "${audio_host}" -p "${audio_port}" | \
     rhasspy-pocketsphinx \
         "${args[@]}" \
-        --events-in-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${start_listening}/#" -t "${stop_listening}/#") \
-        --event-start "${start_listening}" \
-        --event-stop "${stop_listening}" \
-        --event-reload "${reload}" \
-        --event-captured "${text_captured}" | \
+        --events-in-file <(mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}") | \
     tee /dev/stderr | \
-    while read -r topic json;
+    while read -r topic payload;
     do
-        echo -n "${json}" | mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -s -t "${topic}"
+        mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"
     done

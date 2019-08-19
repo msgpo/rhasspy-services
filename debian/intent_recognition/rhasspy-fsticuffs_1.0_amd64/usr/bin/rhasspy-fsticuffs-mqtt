@@ -2,7 +2,9 @@
 
 # MQTT wrapper around fsticuffs
 
-export rhasspy_dir='/usr/lib/rhasspy'
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
 
 # -----------------------------------------------------------------------------
 # Command-line Arguments
@@ -15,10 +17,7 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 # MQTT
 DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
-
-# Events
-DEFINE_string 'recognize-intent' 'rhasspy/intent-recognition/recognize-intent' 'Topic for intent recognition request'
-DEFINE_string 'intent-recognized' 'rhasspy/intent-recognition/intent-recognized' 'Topic for intent recognition response'
+DEFINE_string 'mqtt-topic' 'rhasspy/intent-recognition/#' 'MQTT topic to subscribe to'
 
 # fsticuffs
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
@@ -39,6 +38,7 @@ profile_dir="${FLAGS_profile}"
 
 mqtt_host="${FLAGS_mqtt_host}"
 mqtt_port="${FLAGS_mqtt_port}"
+mqtt_topic="${FLAGS_mqtt_topic}"
 
 intent_fst="${FLAGS_intent_fst}"
 
@@ -54,24 +54,19 @@ if [[ "${FLAGS_fuzzy}" -eq "${FLAGS_TRUE}" ]]; then
     fuzzy='true'
 fi
 
-recognize_intent="${FLAGS_recognize_intent}"
-intent_recognized="${FLAGS_intent_recognized}"
-
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
 
 if [[ ! -z "${profile_dir}" ]]; then
-    profile_dir="$(realpath "${profile_dir}")"
-    export profile_dir
+    export profile_dir="$(realpath "${profile_dir}")"
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                         -q mqtt_port 'mqtt.port' "${mqtt_port}" \
+                        -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
                         -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
-                        -q skip_unknown 'intent-recognition.fsticuffs.skip_unknown' "${skip_unknown}" \
-                        -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" \
-                        -q recognize_intent 'intent-recognition.mqtt-events.recognize-intent' "${recognize_intent}" \
-                        -q intent_recognized 'intent-recognition.mqtt-events.intent-recognized' "${intent_recognized}" | \
+                        -q skip_unknown 'intent-recognition.fsticuffs.skip-unknown' "${skip_unknown}" \
+                        -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" | \
                  tee /dev/stderr)
 fi
 
@@ -93,7 +88,12 @@ fi
 
 args+=("$@")
 
-rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -t "${recognize_intent}" | \
+# -----------------------------------------------------------------------------
+
+rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}" | \
     rhasspy-fsticuffs "${args[@]}" | \
     tee /dev/stderr | \
-    mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -l -t "${intent_recognized}"
+    while read -r topic payload;
+    do
+        mosquitto_pub -h "${mqtt_host}" -p "${mqtt_port}" -t "${topic}" -m "${payload}"
+    done

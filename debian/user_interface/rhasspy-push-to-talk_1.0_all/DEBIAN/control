@@ -1,0 +1,8 @@
+Package: rhasspy-push-to-talk
+Version: 1.0
+Section: utils
+Priority: optional
+Depends: python3
+Architecture: all
+Maintainer: Michael Hansen
+Description: Push to talk web interface for Rhasspy assistant

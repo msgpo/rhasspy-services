@@ -46,8 +46,9 @@ def wait_for_wake_word(
     sensitivity: List[float] = [],
     auto_start: bool = False,
 ):
-    def send_event(topic, payload_dict={}):
-        print(topic, end=" ")
+    def send_event(topic, payload_dict={}, show_event=True):
+        if show_event:
+            print(topic, end=" ")
 
         with jsonlines.Writer(events_out_file) as out:
             out.write(payload_dict)
@@ -186,7 +187,7 @@ def wait_for_wake_word(
 
                 logger.debug(f"Keyword {keyword_index} detected")
                 result = {"index": keyword_index, "keyword": keyword[keyword_index]}
-                send_event(EVENT_DETECTED, result)
+                send_event(EVENT_DETECTED, result, show_event=False)
 
             chunk = audio_file.read(chunk_size)
 

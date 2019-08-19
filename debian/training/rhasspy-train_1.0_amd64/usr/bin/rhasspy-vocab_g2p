@@ -1,20 +1,88 @@
 #!/usr/bin/env bash
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+# phonetisaurus
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'model' '' 'Path to G2P fst model'
+DEFINE_integer 'nbest' 5 'Maximum number of hypotheses to produce'
+DEFINE_string 'unknown' '' 'Path to unknown words list'
+
+# vocab_g2p
+DEFINE_string 'output' '' 'Path to write guesses'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
 set -e
 
-temp_list="$(mktemp)"
-function finish {
-    rm -f "${temp_list}"
-}
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='true'
+fi
 
-trap finish EXIT
+model="${FLAGS_model}"
+nbest="${FLAGS_nbest}"
+unknown="${FLAGS_unknown}"
+output="${FLAGS_output}"
+
+# -----------------------------------------------------------------------------
+# Required Settings
+# -----------------------------------------------------------------------------
+
+if [[ -z "${model}" ]]; then
+    echo "Model is required"
+    exit 1
+fi
+
+phonetisaurus_args=('--model' "${model}")
+vocab_g2p_args=()
+
+if [[ ! -z "${nbest}" ]]; then
+    phonetisaurus_args+=('--nbest' "${nbest}")
+fi
+
+if [[ ! -z "${debug}" ]]; then
+    vocab_g2p_args+=('--debug')
+fi
+
+if [[ ! -z "${output}" ]]; then
+    vocab_g2p_args+=('--output' "${output}")
+fi
 
 # -----------------------------------------------------------------------------
 
-install_dir='/usr/lib/rhasspy/train'
-export PATH="${install_dir}:${PATH}"
-export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
+if [[ -z "${unknown}" ]]; then
+    # Use temporary file and stdin
+    unknown="$(mktemp)"
+    function finish {
+        rm -f "${unknown}"
+    }
 
-cat > "${temp_list}"
-"${install_dir}/phonetisaurus-apply" \
-    --word_list "${temp_list}" "$@" | \
-    "${install_dir}/vocab_g2p"
+    trap finish EXIT
+
+    cat > "${unknown}"
+fi
+
+phonetisaurus_args+=('--word_list' "${unknown}")
+
+# -----------------------------------------------------------------------------
+
+train_dir="${rhasspy_dir}/train"
+
+export PATH="${train_dir}:${PATH}"
+export LD_LIBRARY_PATH="${train_dir}:${LD_LIBRARY_PATH}"
+
+phonetisaurus-apply "${phonetisaurus_args[@]}" | \
+    "${train_dir}/vocab_g2p" "${vocab_g2p_args[@]}"

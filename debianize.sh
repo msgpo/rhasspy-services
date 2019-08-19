@@ -21,21 +21,16 @@ output_dir="${package_dir}/usr/lib/rhasspy/${name}"
 mkdir -p "${output_dir}"
 
 # Copy PyInstaller-generated files
-rsync -av --delete \
-      "dist/${name}/" \
-      "${output_dir}"
+if [[ -d "dist/${name}" ]]; then
+    rsync -av --delete \
+          "dist/${name}/" \
+          "${output_dir}"
 
-# Remove all symbols (Liantian warning)
-strip --strip-all "${output_dir}"/*.so* || true
+    # Remove all symbols (Liantian warning)
+    strip --strip-all "${output_dir}"/*.so* || true
 
-# Remove executable bit from shared libs (Lintian warning)
-chmod -x "${output_dir}"/*.so* || true
-
-# Copy bin scripts
-bin_dir="${category}/${package_name}/bin"
-if [[ -d "${bin_dir}" ]]; then
-    mkdir -p "${output_dir}/usr/bin"
-    cp "${bin_dir}"/rhasspy-* "${output_dir}/usr/bin/"
+    # Remove executable bit from shared libs (Lintian warning)
+    chmod -x "${output_dir}"/*.so* || true
 fi
 
 # Actually build the package

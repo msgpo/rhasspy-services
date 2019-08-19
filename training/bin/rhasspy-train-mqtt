@@ -19,10 +19,8 @@ DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
 DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
 DEFINE_string 'mqtt-topic' 'rhasspy/training/#' 'MQTT topic to subscribe to'
 
-# Events
-DEFINE_string 'start-training' 'rhasspy/training/start-training' 'Topic for re-training request'
-DEFINE_string 'training-failed' 'rhasspy/training/training-failed' 'Topic for training failure response'
-DEFINE_string 'training-complete' 'rhasspy/training/training-complete' 'Topic for training completion response'
+# Training
+DEFINE_boolean 'fail-unknown' 'Training fails if there are unknown words'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -43,6 +41,10 @@ if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
     debug='--debug'
 fi
 
+if [[ "${FLAGS_fail_unknown}" -eq "${FLAGS_TRUE}" ]]; then
+    fail_unknown='true'
+fi
+
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
@@ -57,6 +59,7 @@ source <(rhasspy-yq "${profile_dir}/profile.yml" \
                     -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                     -q mqtt_port 'mqtt.port' "${mqtt_port}" \
                     -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
+                    -q custom_words 'training.custom-words-file' "${profile_dir}/custom_words.txt" \
                     -q unknown 'training.unknown-words-file' "${profile_dir}/unknown.txt" \
                     -q guess 'training.guess-words-file' "${profile_dir}/guess_words.json" | \
              tee /dev/stderr)
@@ -102,7 +105,7 @@ function send_event {
 set +e
 
 # Main loop
-mosquitto_sub -v -t "${mqtt_topic}" | \
+rhasspy-jsonl-sub -v -t "${mqtt_topic}" | \
     while read -r topic payload;
     do
         # Split topic by /
@@ -142,13 +145,31 @@ mosquitto_sub -v -t "${mqtt_topic}" | \
                     echo ''
 
                     if [[ -f "${guess}" ]]; then
-                        # Report guessed pronunciations
-                        jq -jcn \
-                           --argjson guess "$(cat "${guess}")" \
-                           '{ "error": "unknown words", "unknown_words":$guess }' | \
-                            send_event "${event_error}${request_id}" '-'
+                        if [[ -z "${fail_unknown}" ]]; then
+                            # Report guessed pronunciations
+                            jq -jcn \
+                               --argjson guess "$(cat "${guess}")" \
+                               '{ "error": "unknown words", "unknown_words":$guess }' | \
+                                send_event "${event_error}${request_id}" '-'
+                        else
+                            # Use first guess and re-train
+                            touch "${custom_words}"
+                            jq -r 'keys[]' < "${guess}" | \
+                                while read -r word;
+                                do
+                                    first_guess="$(jq -r --arg w "${word}" '.[$w][0]' < "${guess}")"
+                                    echo "${word}" "${first_guess}" >> "${custom_words}"
+                                done
+
+                            # Re-train with new words
+                            (rhasspy-train \
+                                 --profile "${profile_dir}" \
+                                 2>&1 | \
+                                 tee /dev/stderr \
+                                     > "${error_file}") || exit 1
+                        fi
                     else
-                        # Simply report unknown words
+                        # No guesses. Simply report that there were unknown words.
                         error_message='unknown words'
                         exit 1
                     fi

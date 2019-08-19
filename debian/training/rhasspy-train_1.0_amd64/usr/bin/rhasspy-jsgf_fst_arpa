@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-install_dir='/usr/lib/rhasspy/train'
-export PATH="${install_dir}:${PATH}"
-export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
 
-"${install_dir}/jsgf_fst_arpa" "$@"
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+train_dir="${rhasspy_dir}/train"
+
+export PATH="${train_dir}:${PATH}"
+export LD_LIBRARY_PATH="${train_dir}:${LD_LIBRARY_PATH}"
+
+"${train_dir}/jsgf_fst_arpa" "$@"

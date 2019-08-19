@@ -30,6 +30,7 @@ rhasspy_paths+=("${this_dir}/training/ini_jsgf/bin")
 rhasspy_paths+=("${this_dir}/training/jsgf_fst_arpa/bin")
 rhasspy_paths+=("${this_dir}/training/vocab_dict/bin")
 rhasspy_paths+=("${this_dir}/training/vocab_g2p/bin")
+rhasspy_paths+=("${this_dir}/user_interface/push-to-talk/bin")
 
 # Convert to colon-delimited string
 rhasspy_path=$(IFS=':'; echo "${rhasspy_paths[*]}")

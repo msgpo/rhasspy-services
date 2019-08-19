@@ -2,7 +2,7 @@ Package: rhasspy-webrtcvad
 Version: 1.0
 Section: utils
 Priority: optional
-Depends: netcat, mosquitto-clients, rhasspy-yq (=1.0)
+Depends: netcat, mosquitto-clients, rhasspy-jsonl-sub (=1.0), rhasspy-yq (=1.0)
 Architecture: amd64
 Maintainer: Michael Hansen
 Description: webrtcvad-based voice command detection tool for Rhasspy voice assistant

@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+DEFINE_string 'phoneme-map' '' 'Path to espeak phoneme map'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+phoneme_map="${FLAGS_phoneme_map}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q phoneme_map 'training.espeak-phoneme-map' "${phoneme_map}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+
+output="$(mktemp)"
+function cleanup {
+    rm -f "${output}"
+}
+
+trap cleanup EXIT
+touch "${output}"
+
+# -----------------------------------------------------------------------------
+
+guess_words="$(cat)"
+echo "${guess_words}" | \
+    jq -r 'keys[]' | \
+    while read -r word;
+    do
+        echo "${word}" > /dev/stderr
+        echo "${guess_words}" | \
+            jq -r \
+               --arg word "${word}" \
+               '.[$word][]' | \
+            while read -r guess;
+            do
+                echo "${guess}" | \
+                    rhasspy-pronounce \
+                        --phoneme-map "${phoneme_map}" \
+                        --phonemes \
+                        --pause 0 \
+                        > /dev/stderr
+
+                read -p 'Correct? [y/n]: ' correct < /dev/tty > /dev/stderr
+                if [[ "${correct}" == 'y' ]]; then
+                    echo "${word} ${guess}" >> "${output}"
+                    echo 'OK' > /dev/stderr
+                    break
+                fi
+            done
+        echo '' > /dev/stderr
+    done
+
+cat "${output}"

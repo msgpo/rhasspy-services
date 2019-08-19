@@ -6,6 +6,7 @@
         debian-languages \
         debian-pocketsphinx \
         debian-porcupine \
+        debian-program-launcher \
         debian-train \
         docker-assistant-en-us \
         docker-espeak \
@@ -119,7 +120,7 @@ debian-kaldi: installer-kaldi
 	bash debianize.sh speech_to_text kaldi $(FRIENDLY_ARCH)
 
 debian-languages:
-	output_dir="debian/languages/rhasspy-en-us-pocketsphinx-cmu_1.0_all/usr/lib/rhasspy/languages/english/en-us_pocketsphinx-cmu/"; \
+	output_dir="debian/languages/rhasspy-en-us-pocketsphinx-cmu_1.0_all/usr/lib/rhasspy/languages/english/en-us_pocketsphinx-cmu"; \
     mkdir -p "$${output_dir}" && \
     rsync -av --delete languages/english/en-us_pocketsphinx-cmu/ "$${output_dir}/"
 	cd debian/languages && fakeroot dpkg --build rhasspy-en-us-pocketsphinx-cmu_1.0_all
@@ -132,6 +133,18 @@ debian-pocketsphinx: installer-pocketsphinx
 
 debian-porcupine: installer-porcupine
 	bash debianize.sh wake_word porcupine $(FRIENDLY_ARCH)
+
+debian-program-launcher:
+	bash debianize.sh applications program-launcher $(FRIENDLY_ARCH)
+
+debian-push-to-talk:
+	debian_dir="debian/user_interface/rhasspy-push-to-talk_1.0_all"; \
+	bin_dir="$${debian_dir}/usr/bin"; \
+	output_dir="$${debian_dir}/usr/lib/rhasspy/user_interface/push-to-talk"; \
+    mkdir -p "$${bin_dir}" "$${output_dir}" && \
+    rsync -av --delete --exclude=bin user_interface/push-to-talk/ "$${output_dir}/" && \
+    cp user_interface/push-to-talk/bin/rhasspy-* "$${bin_dir}/"
+	cd debian/user_interface && fakeroot dpkg --build rhasspy-push-to-talk_1.0_all
 
 debian-train: installer-train
 	rsync -av dist/ini_jsgf/ dist/vocab_g2p/ dist/vocab_dict/ dist/jsgf_fst_arpa/ dist/train/

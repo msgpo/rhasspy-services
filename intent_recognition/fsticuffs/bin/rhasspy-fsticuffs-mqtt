@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# MQTT wrapper around fsticuffs
+
 if [[ -z "${rhasspy_dir}" ]]; then
     export rhasspy_dir='/usr/lib/rhasspy'
 fi
@@ -88,7 +90,7 @@ args+=("$@")
 
 # -----------------------------------------------------------------------------
 
-mosquitto_sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}" | \
+rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}" | \
     rhasspy-fsticuffs "${args[@]}" | \
     tee /dev/stderr | \
     while read -r topic payload;

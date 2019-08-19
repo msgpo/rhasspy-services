@@ -21,6 +21,9 @@ def main():
         "--g2p-model", help="Use g2p model to guess word pronunciations"
     )
     parser.add_argument(
+        "--phonemes", action="store_true", help="Pronounce phonemes with espeak"
+    )
+    parser.add_argument(
         "--pause",
         type=float,
         default=0.25,
@@ -28,7 +31,7 @@ def main():
     )
     parser.add_argument("--skip", type=int, default=0, help="Skip n words")
     parser.add_argument(
-        "--espeak-word", action="store_true", help="Prononuce word with espeak too"
+        "--espeak-word", action="store_true", help="Pronounce word with espeak too"
     )
     parser.add_argument(
         "--play-program", help="Program to pipe WAV data into via stdin"
@@ -43,8 +46,8 @@ def main():
 
     logger.debug(args)
 
-    if (args.dictionary is None) and (args.g2p_model is None):
-        logger.fatal("Either --dictionary or --g2p-model is required")
+    if (args.dictionary is None) and (args.g2p_model is None) and (not args.phonemes):
+        logger.fatal("Either --dictionary or --g2p-model or --phonemes is required")
         sys.exit(1)
 
     if args.play_program is not None:
@@ -98,50 +101,60 @@ def main():
             logger.debug(f"Skipping {word}")
             continue
 
-        if args.espeak_word:
-            # Speak with espeak alone
-            espeak_cmd = (
-                ["espeak-ng", "-s", "80", "-x", "-q", "--sep= "] + rest_args + [word]
-            )
-            logger.debug(espeak_cmd)
-            espeaks = subprocess.check_output(espeak_cmd).decode().strip()
-            print(word, espeaks)
-
-            play_espeak(["espeak-ng", "-s", "80"] + rest_args, word, args.play_espeak)
-            time.sleep(args.pause)
-
-        if has_dictionary:
-            # Look up
-            arpas = word_to_arpa.get(word, [])
+        if args.phonemes:
+            # Assume input is phonemes
+            arpas = re.split(r"\s", word)
         else:
-            # Guess
-            with tempfile.NamedTemporaryFile(suffix=".txt", mode="w") as word_file:
-                print(word, file=word_file)
-                word_file.seek(0)
-
-                phonetisaurus_cmd = [
-                    "phonetisaurus-apply",
-                    "--model",
-                    args.g2p_model,
-                    "--word_list",
-                    word_file.name,
-                    "--nbest",
-                    "1",
-                ]
-
-                logging.debug(phonetisaurus_cmd)
-                phonetisaurus_output = (
-                    subprocess.check_output(phonetisaurus_cmd).decode().strip()
+            # Assume input is a word
+            if args.espeak_word:
+                # Speak with espeak alone
+                espeak_cmd = (
+                    ["espeak-ng", "-s", "80", "-x", "-q", "--sep= "] + rest_args + [word]
                 )
+                logger.debug(espeak_cmd)
+                espeaks = subprocess.check_output(espeak_cmd).decode().strip()
+                print(word, espeaks)
 
-                arpas = re.split(r"\s+", phonetisaurus_output)[1:]
+                play_espeak(["espeak-ng", "-s", "80"] + rest_args, word, args.play_espeak)
+                time.sleep(args.pause)
+
+            if has_dictionary:
+                # Look up
+                arpas = word_to_arpa.get(word, [])
+            else:
+                # Guess
+                with tempfile.NamedTemporaryFile(suffix=".txt", mode="w") as word_file:
+                    print(word, file=word_file)
+                    word_file.seek(0)
+
+                    phonetisaurus_cmd = [
+                        "phonetisaurus-apply",
+                        "--model",
+                        args.g2p_model,
+                        "--word_list",
+                        word_file.name,
+                        "--nbest",
+                        "1",
+                    ]
+
+                    logging.debug(phonetisaurus_cmd)
+                    phonetisaurus_output = (
+                        subprocess.check_output(phonetisaurus_cmd).decode().strip()
+                    )
+
+                    arpas = re.split(r"\s+", phonetisaurus_output)[1:]
 
         # Use phoneme map
         espeaks = [arpa_to_espeak.get(a, "") for a in arpas]
         espeak_str = "".join(espeaks)
         logger.debug(espeak_str)
 
-        print(word, " ".join(f"{a}/{e}" for a, e in zip(arpas, espeaks)))
+        if args.phonemes:
+            print(word, end=" | ")
+        else:
+            print(word, end=" ")
+
+        print(" ".join(f"{a}/{e}" for a, e in zip(arpas, espeaks)))
 
         play_espeak(
             ["espeak-ng", "-s", "80"] + rest_args,
@@ -157,7 +170,7 @@ def main():
 def play_espeak(espeak_cmd, espeak_str, play_program=None):
     if play_program is None:
         # Play through espeak
-        espeak_cmd.append(espeak_cmd)
+        espeak_cmd.append(espeak_str)
         logger.debug(espeak_cmd)
 
         subprocess.check_call(espeak_cmd)

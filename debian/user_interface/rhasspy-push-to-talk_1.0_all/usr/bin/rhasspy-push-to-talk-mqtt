@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+cd "${rhasspy_dir}/user_interface/push-to-talk" && \
+    python3 -m http.server "$@"

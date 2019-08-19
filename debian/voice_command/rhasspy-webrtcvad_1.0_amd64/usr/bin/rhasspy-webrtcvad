@@ -1,4 +1,8 @@
 #!/usr/bin/env sh
-install_dir='/usr/lib/rhasspy/webrtcvad'
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+install_dir="${rhasspy_dir}/webrtcvad"
 export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
 "${install_dir}/webrtcvad" "$@"

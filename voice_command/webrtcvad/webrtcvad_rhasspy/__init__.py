@@ -49,7 +49,7 @@ def wait_for_command(
     silence_seconds=0.5,
 ):
     def send_event(topic, payload_dict={}):
-        print(topic, end=" ")
+        print(topic, end=" ", file=events_out_file)
 
         with jsonlines.Writer(events_out_file) as out:
             out.write(payload_dict)
