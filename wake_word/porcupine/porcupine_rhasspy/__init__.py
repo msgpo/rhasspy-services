@@ -185,9 +185,10 @@ def wait_for_wake_word(
                 if len(keyword) == 1:
                     keyword_index = 0
 
-                logger.debug(f"Keyword {keyword_index} detected")
-                result = {"index": keyword_index, "keyword": keyword[keyword_index]}
-                send_event(EVENT_DETECTED, result, show_event=False)
+                if keyword_index >= 0:
+                    logger.debug(f"Keyword {keyword_index} detected")
+                    result = {"index": keyword_index, "keyword": keyword[keyword_index]}
+                    send_event(EVENT_DETECTED, result, show_event=False)
 
             chunk = audio_file.read(chunk_size)
 

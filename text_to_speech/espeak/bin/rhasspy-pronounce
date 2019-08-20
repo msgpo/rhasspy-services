@@ -37,6 +37,9 @@ def main():
         "--play-program", help="Program to pipe WAV data into via stdin"
     )
     parser.add_argument(
+        "--quiet", action="store_true", help="Don't print anything to the console"
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to the console"
     )
     args, rest_args = parser.parse_known_args()
@@ -109,13 +112,19 @@ def main():
             if args.espeak_word:
                 # Speak with espeak alone
                 espeak_cmd = (
-                    ["espeak-ng", "-s", "80", "-x", "-q", "--sep= "] + rest_args + [word]
+                    ["espeak-ng", "-s", "80", "-x", "-q", "--sep= "]
+                    + rest_args
+                    + [word]
                 )
                 logger.debug(espeak_cmd)
                 espeaks = subprocess.check_output(espeak_cmd).decode().strip()
-                print(word, espeaks)
 
-                play_espeak(["espeak-ng", "-s", "80"] + rest_args, word, args.play_espeak)
+                if not args.quiet:
+                    print(word, espeaks)
+
+                play_espeak(
+                    ["espeak-ng", "-s", "80"] + rest_args, word, args.play_espeak
+                )
                 time.sleep(args.pause)
 
             if has_dictionary:
@@ -149,12 +158,13 @@ def main():
         espeak_str = "".join(espeaks)
         logger.debug(espeak_str)
 
-        if args.phonemes:
-            print(word, end=" | ")
-        else:
-            print(word, end=" ")
+        if not args.quiet:
+            if args.phonemes:
+                print(word, end=" | ")
+            else:
+                print(word, end=" ")
 
-        print(" ".join(f"{a}/{e}" for a, e in zip(arpas, espeaks)))
+            print(" ".join(f"{a}/{e}" for a, e in zip(arpas, espeaks)))
 
         play_espeak(
             ["espeak-ng", "-s", "80"] + rest_args,

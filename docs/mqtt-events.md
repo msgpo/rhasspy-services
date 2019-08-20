@@ -135,9 +135,14 @@ Event prefix: `rhasspy/text-to-speech/`
     * `say-text`
         * Generate an audio file with spoken text and send a `rhasspy/audio-output/play-uri` event with its URI
         * `text` - text to speak
+    * `pronounce-phonemes`
+        * Generate an audio file with a pronunciation of the given phonemes and send a `rhasspy/audio-output/play-uri` event with its URI
+        * `phonemes` - phonemes to speak, separated by spaces
 * Output Events
     * `text-said`
         * Response to `say-text`
+    * `phonemes-pronounced`
+        * Response to `pronounce-phonemes`
 
 ## Audio Output
 
@@ -164,5 +169,7 @@ Event prefix: `rhasspy/training/`
         * Response to `start-training`
     * `training-completed`
         * Response sent when training was successful
+    * `training-failed`
+        * Response sent when training was **not** successful
     * `error`
         * Unexpected error

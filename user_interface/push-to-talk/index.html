@@ -45,6 +45,9 @@
 
             <form onsubmit="return submitChat();" class="form mt-1">
                 <div class="row ">
+                    <div class="col-xs-1 mr-2">
+                        <button id="pronounce" class="btn btn-info" type="button">Pronounce</button>
+                    </div>
                     <div class="col">
                         <input text="text" class="form-control" id="chat-text">
                     </div>
@@ -206,7 +209,7 @@
              sendEvent('rhasspy/speech-to-text/stop-listening' + siteId)
          })
 
-         // Handle "Re-Train" button click
+         // Handle "Train" button click
          $('#train').click(function(evt) {
              if (trainTimeoutId) {
                  // Reset everything
@@ -237,10 +240,19 @@
              }
          })
 
+         // Handle "Reload" button click
          $('#reload').click(function(evt) {
              // Reload speech and intent models
              sendEvent('rhasspy/speech-to-text/reload' + siteId)
              sendEvent('rhasspy/intent-recognition/reload' + siteId)
+         })
+
+         // Handle "Pronounce" button click
+         $('#pronounce').click(function(evt) {
+             sendEvent('rhasspy/text-to-speech/pronounce-phonemes' + siteId,
+                       JSON.stringify({
+                           'phonemes': $('#chat-text').val()
+                       }))
          })
 
          // -------------------------------------------------------------------

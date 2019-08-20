@@ -54,6 +54,7 @@ if [[ ! -z "${profile_dir}" ]]; then
                         -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                         -q mqtt_port 'mqtt.port' "${mqtt_port}" \
                         -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
+                        -q phoneme_map 'training.espeak-phoneme-map' "${phoneme_map}" \
                         -q cache_directory 'text-to-speech.cache.cache-directory' "${cache_directory}" \
                         -q voice 'text-to-speech.espeak.voice' "${voice}" | \
                  tee /dev/stderr)
@@ -61,6 +62,10 @@ if [[ ! -z "${profile_dir}" ]]; then
     if [[ -z "${cache_directory}" ]]; then
         # Default to profile directory for cache
         cache_directory="${profile_dir}/tts_cache"
+    fi
+
+    if [[ -z "${phoneme_map}" ]]; then
+        phoneme_map="${profile_dir}/espeak_phonemes.txt"
     fi
 fi
 
@@ -94,9 +99,11 @@ event_prefix='rhasspy/text-to-speech'
 
 # Input
 event_say="${event_prefix}/say-text"
+event_pronounce="${event_prefix}/pronounce-phonemes"
 
 # Output
 event_said="${event_prefix}/text-said"
+event_pronounced="${event_prefix}/phonemes-pronounced"
 
 # Other
 event_play='rhasspy/audio-output/play-uri'
@@ -135,7 +142,8 @@ rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}" | \
         fi
 
         if [[ "${base_topic}" == "${event_say}" ]]; then
-            text="$(echo -n "${json}" | jq '.text')"
+            # Speak sentence using eSpeak
+            text="$(echo -n "${json}" | jq -r '.text')"
             if [[ ! -z "${text}" ]]; then
                 echo "${text}"
 
@@ -151,5 +159,33 @@ rhasspy-jsonl-sub -h "${mqtt_host}" -p "${mqtt_port}" -v -t "${mqtt_topic}" | \
 
             # Report that text was said
             send_event "${event_said}${request_id}" "${json}"
+        elif [[ "${base_topic}" == "${event_pronounce}" ]]; then
+            # Pronouce phonemes
+            phonemes="$(echo -n "${json}" | jq -r '.phonemes')"
+            if [[ ! -z "${phonemes}" ]]; then
+                echo "${phonemes}"
+
+                if [[ -f "${phoneme_map}" ]]; then
+                    # Cache WAV file
+                    filename="$(echo "${voice}-${phonemes}" | md5sum | awk '{ print $1 }').wav"
+                    echo "${phonemes}" | \
+                        rhasspy-pronounce \
+                            --phonemes \
+                            --phoneme-map "${phoneme_map}" \
+                            --play-program cat \
+                            --quiet \
+                            "${args[@]}" \
+                            > "${cache_directory}/${filename}"
+
+                    # Request playback
+                    jq -jc -n --arg uri "${base_uri}/${filename}" '{uri:$uri}' | \
+                        send_event "${event_play}${request_id}" '-'
+                else
+                    echo "Missing phoneme map at ${phoneme_map}"
+                fi
+            fi
+
+            # Report that phonemes were pronounced
+            send_event "${event_pronounced}${request_id}" "${json}"
         fi
     done
