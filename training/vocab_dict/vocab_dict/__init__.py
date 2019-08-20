@@ -21,15 +21,15 @@ def make_dict(
     transform = lambda w: w
     if upper:
         transform = lambda w: w.upper()
-        logging.debug("Forcing upper-case")
+        logger.debug("Forcing upper-case")
     elif lower:
         transform = lambda w: w.lower()
-        logging.debug("Forcing lower-case")
+        logger.debug("Forcing lower-case")
 
     # Read dictionaries
     word_dict: Dict[str, List[str]] = {}
     for dict_path in dictionary_paths:
-        logging.debug(f"Loading dictionary from {dict_path}")
+        logger.debug(f"Loading dictionary from {dict_path}")
         with open(dict_path, "r") as dict_file:
             read_dict(dict_file, word_dict, transform)
 
@@ -44,7 +44,7 @@ def make_dict(
             word = transform(word)
             words_needed.add(word)
 
-    logging.debug(f"Loaded {len(words_needed)} word(s) from {vocab_path}")
+    logger.debug(f"Loaded {len(words_needed)} word(s) from {vocab_path}")
 
     # Write output dictionary
     unknown_words: List[str] = []
@@ -60,7 +60,8 @@ def make_dict(
                 print("%s(%s)" % (word, i + 1), pronounce, file=dictionary_file)
 
     if len(unknown_words) > 0:
-        logging.warning(f"{len(unknown_words)} word(s) are unknown")
+        logger.warning(f"{len(unknown_words)} word(s) are unknown")
+        logger.warning(",".join(unknown_words))
 
         # Write unknown words
         if unknown_path:
@@ -69,7 +70,7 @@ def make_dict(
                 for word in unknown_words:
                     print(word, file=unknown_file)
 
-            logging.debug(f"Wrote unknown words to {unknown_path}")
+            logger.debug(f"Wrote unknown words to {unknown_path}")
 
     return unknown_words
 
@@ -110,6 +111,6 @@ def read_dict(
             else:
                 word_dict[word] = [pronounce]
         except Exception as e:
-            logging.warning(f"read_dict: {e}")
+            logger.warning(f"read_dict: {e}")
 
     return word_dict

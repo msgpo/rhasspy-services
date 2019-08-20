@@ -57,7 +57,7 @@ def main():
     )
 
     if (len(unknown_words) > 0) and (args.unknown is None):
-        logging.fatal("Unknown words: %s" % ", ".join(unknown_words))
+        logger.fatal("Unknown words: %s" % ", ".join(unknown_words))
         sys.exit(1)
 
 

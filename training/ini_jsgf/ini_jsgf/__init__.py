@@ -25,7 +25,7 @@ def make_grammars(
     config.optionxform = lambda x: str(x)  # case sensitive
     config.read_file(ini_file)
 
-    logging.debug("Loaded ini file")
+    logger.debug("Loaded ini file")
 
     # Process configuration sections
     grammar_rules = {}
@@ -57,7 +57,7 @@ def make_grammars(
         grammar_path = os.path.join(grammar_dir, "{0}.gram".format(name))
 
         if os.path.exists(grammar_path) and no_overwrite:
-            logging.debug(f"Skipping {grammar_path}")
+            logger.debug(f"Skipping {grammar_path}")
             continue
 
         # Only overwrite grammar file if it contains rules or doesn't yet exist
@@ -78,8 +78,8 @@ def make_grammars(
                     print(rule, file=grammar_file)
 
             grammar_paths.append(grammar_path)
-            logging.debug(f"Wrote {grammar_path} ({len(rules)} rule(s))")
+            logger.debug(f"Wrote {grammar_path} ({len(rules)} rule(s))")
         else:
-            logging.debug(f"No rules for {grammar_path}")
+            logger.debug(f"No rules for {grammar_path}")
 
     return grammar_paths

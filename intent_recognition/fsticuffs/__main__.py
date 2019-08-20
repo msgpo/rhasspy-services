@@ -104,32 +104,41 @@ def main():
 
     # -------------------------------------------------------------------------
 
-    # Load intent fst
-    intent_fst = fst.Fst.read(args.intent_fst)
-    logger.debug(f"Loaded FST from {args.intent_fst}")
-
-    # Add symbols from FST
-    known_tokens: Optional[Set[str]] = None
-
-    if args.skip_unknown:
-        # Ignore words outside of input symbol table
-        known_tokens = set()
-        in_symbols = intent_fst.input_symbols()
-        for i in range(in_symbols.num_symbols()):
-            token = in_symbols.find(i).decode()
-            known_tokens.add(token)
-
-        logger.debug(f"Skipping words outside of set: {known_tokens}")
-
+    intent_fst = None
+    known_tokens = set()
     intent_graph = None
     stop_words = set()
-    if args.fuzzy:
-        logger.debug("Fuzzy search enabled")
-        intent_graph = fst_to_graph(intent_fst)
 
-        if args.stop_words:
-            with open(args.stop_words, "r") as stop_words_file:
-                stop_words = set([line.strip() for line in stop_words_file])
+    def reload_fst():
+        nonlocal intent_fst, known_tokens, intent_graph, stop_words
+
+        # Load intent fst
+        intent_fst = fst.Fst.read(args.intent_fst)
+        logger.debug(f"Loaded FST from {args.intent_fst}")
+
+        # Add symbols from FST
+        if args.skip_unknown:
+            # Ignore words outside of input symbol table
+            known_tokens = set()
+            in_symbols = intent_fst.input_symbols()
+            for i in range(in_symbols.num_symbols()):
+                token = in_symbols.find(i).decode()
+                known_tokens.add(token)
+
+            logger.debug(f"Skipping words outside of set: {known_tokens}")
+
+        intent_graph = None
+        stop_words = set()
+        if args.fuzzy:
+            logger.debug("Fuzzy search enabled")
+            intent_graph = fst_to_graph(intent_fst)
+
+            if args.stop_words:
+                with open(args.stop_words, "r") as stop_words_file:
+                    stop_words = set([line.strip() for line in stop_words_file])
+
+    # Initial load
+    reload_fst()
 
     # Recognize lines from stdin
     for line in events_in_file:
@@ -180,9 +189,7 @@ def main():
 
                 event_dict = maybe_object(event)
                 args.intent_fst = event_dict.get("intent-fst", args.intent_fst)
-
-                intent_fst = fst.Fst.read(args.intent_fst)
-                logger.debug(f"Loaded FST from {args.intent_fst}")
+                reload_fst()
 
                 send_event(EVENT_RELOADED + request_id, event_dict)
         except Exception as e:

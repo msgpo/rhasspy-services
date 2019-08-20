@@ -3,8 +3,10 @@ import logging
 
 logger = logging.getLogger("ini_jsgf")
 
+import os
 import sys
 import argparse
+import shutil
 
 from .ini_jsgf import make_grammars
 
@@ -16,6 +18,11 @@ def main():
     )
     parser.add_argument(
         "--ini-file", default=None, help="Path to ini file (default=stdin)"
+    )
+    parser.add_argument(
+        "--no-clear",
+        action="store_true",
+        help="Don't delete existing grammar files",
     )
     parser.add_argument(
         "--no-overwrite",
@@ -35,7 +42,11 @@ def main():
         ini_file = open(args.ini_file, "r")
     else:
         ini_file = sys.stdin
-        logging.debug("Reading from standard in")
+        logger.debug("Reading from standard in")
+
+    if (not args.no_clear) and os.path.exists(args.grammar_dir):
+        logger.debug(f"Deleting {args.grammar_dir}")
+        shutil.rmtree(args.grammar_dir)
 
     make_grammars(ini_file, args.grammar_dir, no_overwrite=args.no_overwrite)
 

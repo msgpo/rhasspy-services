@@ -7,46 +7,59 @@
 
         <!-- CSS -->
         <link rel="stylesheet" href="/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/css/main.css">
 
-        <title>Push to Talk</title>
+        <title>Rhasspy - Push to Talk</title>
     </head>
     <body class="bg-dark">
         <noscript>
             <strong>Please enable Javascript to continue.</strong>
         </noscript>
 
-        <div class="d-flex h-100 text-center">
-            <div id="connected" class="flex-grow-1 bg-danger text-white font-weight-bold p-2">NOT CONNECTED</div>
-        </div>
-
-        <div class="d-flex h-100 text-center">
-            <div id="siteId" class="flex-grow-1 bg-info text-white font-weight-bold p-1"><span></span></div>
-        </div>
-
-        <div class="d-flex h-100">
-            <div class="flex-grow-1">
-                <button id="ptt" class="btn w-100">
-                    <img src="/img/microphone.svg" />
-                </button>
-            </div>
-        </div>
-
-        <form onsubmit="return submitChat();" class="form mt-1">
-            <div class="form-group row">
-                <div class="col mr-0 pr-0">
-                    <select class="form-control" id="chat-history">
-                    </select>
+        <div class="container-fluid pl-1 pr-1">
+            <div class="row text-center mb-1">
+                <div class="col">
+                    <div id="connected" class="bg-danger text-white font-weight-bold p-2">NOT CONNECTED</div>
                 </div>
             </div>
-            <div class="form-group row">
-                <div class="col mr-0 pr-0">
-                    <input text="text" class="form-control" id="chat-text">
+
+            <div class="row mt-1">
+                <div class="col">
+                    <img src="img/rhasspy-raven.svg" style="height: 2rem">
+                    <span class="text-white font-weight-bold ml-3">Rhasspy Voice Assistant</span>
+                    <span id="siteId" class="badge badge-light ml-1"></span>
                 </div>
-                <div class="col-auto ml-1 pl-0">
-                    <button class="btn btn-primary" type="button" onclick="submitChat()">Submit</button>
+                <div class="col-xs btn-group">
+                    <button id="train" class="btn btn-success">Train</button>
+                    <button id="reload" class="btn btn-danger ml-2">Reload</button>
                 </div>
             </div>
-        </form>
+
+            <div class="row mt-1">
+                <div class="col">
+                    <button id="ptt" class="btn btn-block">
+                        <img class="h-100" src="/img/microphone.svg" />
+                    </button>
+                </div>
+            </div>
+
+            <form onsubmit="return submitChat();" class="form mt-1">
+                <div class="row ">
+                    <div class="col">
+                        <input text="text" class="form-control" id="chat-text">
+                    </div>
+                    <div class="col-xs-1 ml-2">
+                        <button class="btn btn-primary" type="button" onclick="submitChat()">Submit</button>
+                    </div>
+                </div>
+            </form>
+
+            <div class="row mt-2">
+                <div class="col">
+                    <textarea id="chat-history" class="form-control" type="text" rows="25"></textarea>
+                </div>
+            </div>
+        </div>
 
         <!-- Load Javascript libraries -->
         <script src="/js/paho-mqtt.min.js"></script>
@@ -54,51 +67,184 @@
         <script src="/js/bootstrap.min.js"></script>
 
         <script type="text/javascript">
+         // MQTT
+         var mqttClient = null
+         var mqttHost = location.hostname
+         var mqttPort = 1884
+         var mqttClientId = 'rhasspy-push-to-talk'
+
          var lastButtonColor = null
 
-         var client = null
-
-         var label = 'push-to-talk'
-         var hubHost = location.hostname
-         var hubPort = 1884
-
          var siteId = ''
-         var pubTopic = 'rhasspy/intent-recognition/recognize-intent'
-         var subTopics = ['rhasspy/speech-to-text/text-captured',
-                          'rhasspy/intent-recognition/intent-recognized',
-                          'rhasspy/text-to-speech/speak-text']
+
+         var trainTimeoutId = null
+         var trainColorToggle = false
 
          // -------------------------------------------------------------------
 
+         // Sets up UI and creates MQTT client
          function init() {
              var url = new URL(window.location.href)
-             hubHost = url.searchParams.get('host') || hubHost
-             hubPort = url.searchParams.get('port') || hubPort
+             mqttHost = url.searchParams.get('host') || mqttHost
+             mqttPort = url.searchParams.get('port') || mqttPort
              siteId = url.searchParams.get('siteId') || ''
-             pubTopic = url.searchParams.get('pubTopic') || pubTopic
-             subTopics = url.searchParams.has('subTopic')
-                       ? url.searchParams.getAll('subTopic')
-                       : subTopics
 
              if (siteId.length > 0) {
-                 $('#siteId span').text(siteId)
-                 $('#siteId').show()
-
-                if (!siteId.startsWith('/')) {
-                    siteId = '/' + siteId
-                }
+                 $('#siteId').text(siteId)
              } else {
                  $('#siteId').hide()
              }
 
-             for (var i = 0; i < subTopics.length; i++) {
-                 subTopics[i] = subTopics[i] + siteId + '/#'
+             if (!siteId.startsWith('/')) {
+                 siteId = '/' + siteId
              }
 
-             client = new Paho.Client(hubHost, Number(hubPort), label)
-             $('#label').text(label)
+             if (!siteId.endsWith('/')) {
+                 siteId = siteId + '/'
+             }
+
+             // Clear chat
+             $('#chat-history').val('')
+
+             // Connect to MQTT broker via websocket
+             mqttClient = new Paho.Client(mqttHost, Number(mqttPort), mqttClientId)
          }
 
+         // -------------------------------------------------------------------
+         // MQTT
+         // -------------------------------------------------------------------
+
+         function connect() {
+             mqttClient.onConnectionLost = function(responseObject) {
+                 $('#connected').show()
+             }
+
+             // MQTT message handler
+             mqttClient.onMessageArrived = function(message) {
+                 addToChatHistory(message.topic + ' ' + message.payloadString)
+
+                 var topic = message.topic
+                 if (!topic.endsWith('/')) {
+                     topic = topic + '/'
+                 }
+
+                 if (topic.startsWith('rhasspy/speech-to-text/text-captured/')) {
+                     // Transcription
+                     setButtonColor('btn-primary')
+                 } else if (topic.startsWith('rhasspy/intent-recognition/intent-recognized/')) {
+                     // Intent recognized
+                     var payload = JSON.parse(message.payloadString)
+                     if (payload.intent.name.length > 0) {
+                         setButtonColor('btn-success')
+                     } else {
+                         setButtonColor('btn-danger')
+                     }
+                 } else if (topic.startsWith('rhasspy/training/training-completed/') ||
+                            topic.startsWith('rhasspy/training/training-failed/')) {
+                     // Training completed or failed
+                     if (trainTimeoutId != null) {
+                         clearInterval(trainTimeoutId)
+                         trainTimeoutId = null
+                     }
+
+                     $('#train').removeClass('btn-danger')
+                     $('#train').removeClass('btn-warning')
+                     $('#train').text('Re-Train')
+
+                     if (topic.startsWith('rhasspy/training/training-completed/')) {
+                         // Training completed
+                         setButtonColor('btn-success')
+                     }
+                 } else if (topic.endsWith('/error/')) {
+                     setButtonColor('btn-danger')
+                 }
+             }
+
+             mqttClient.connect({
+                 reconnect: true,
+                 onSuccess: function() {
+                     $('#connected').hide()
+
+                     // Subscribe to all Rhasspy events
+                     mqttClient.subscribe('rhasspy' + siteId + '#')
+                 }
+             })
+         }
+
+         function sendEvent(topic, payload) {
+             if (payload == null) {
+                 // Default to empty JSON object
+                 payload = '{}'
+             }
+
+             message = new Paho.Message(payload)
+             message.destinationName = topic
+             mqttClient.send(message)
+         }
+
+         // -------------------------------------------------------------------
+
+         // Called at start up
+         $(function() {
+             init()
+             connect()
+         })
+
+         // -------------------------------------------------------------------
+         // Event Handlers
+         // -------------------------------------------------------------------
+
+         // Handle microphone button down
+         $('#ptt').mousedown(function(evt) {
+             setButtonColor('btn-danger')
+             sendEvent('rhasspy/speech-to-text/start-listening' + siteId)
+         })
+
+         // Handle microphone button up
+         $('#ptt').mouseup(function(evt) {
+             clearButtonColor()
+             sendEvent('rhasspy/speech-to-text/stop-listening' + siteId)
+         })
+
+         // Handle "Re-Train" button click
+         $('#train').click(function(evt) {
+             if (trainTimeoutId) {
+                 // Reset everything
+                 clearInterval(trainTimeoutId)
+                 trainTimeoutId = null
+                 $('#train').removeClass('btn-warning')
+                 $('#train').removeClass('btn-danger')
+                 $('#train').text('Re-Train')
+             } else {
+                 // Start training
+                 $('#train').text('Cancel')
+                 $('#train').addClass('btn-danger')
+
+                 trainTimeoutId = setInterval(function() {
+                     if (trainColorToggle) {
+                         $('#train').addClass('btn-danger')
+                         $('#train').removeClass('btn-warning')
+                     } else {
+                         $('#train').addClass('btn-warning')
+                         $('#train').removeClass('btn-danger')
+                     }
+
+                     trainColorToggle = !trainColorToggle
+                 }, 500)
+
+                 sendEvent('rhasspy/training/start-training' + siteId)
+                 setButtonColor('btn-info')
+             }
+         })
+
+         $('#reload').click(function(evt) {
+             // Reload speech and intent models
+             sendEvent('rhasspy/speech-to-text/reload' + siteId)
+             sendEvent('rhasspy/intent-recognition/reload' + siteId)
+         })
+
+         // -------------------------------------------------------------------
+         // Utility Methods
          // -------------------------------------------------------------------
 
          function clearButtonColor() {
@@ -115,55 +261,12 @@
              lastButtonColor = btnClass
          }
 
-         function connect() {
-             client.onConnectionLost = function(responseObject) {
-                 $('#connected').show()
-             }
-
-             client.onMessageArrived = function(message) {
-                 if (message.topic.startsWith('rhasspy/speech-to-text/text-captured')) {
-                     setButtonColor('btn-primary')
-                     payload = JSON.parse(message.payloadString)
-                     if (payload.text.length > 0) {
-                         addToChatHistory(payload.text)
-                     }
-                 } else if (message.topic.startsWith('rhasspy/intent-recognition/intent-recognized')) {
-                     payload = JSON.parse(message.payloadString)
-                     if (payload.intent.name.length > 0) {
-                         setButtonColor('btn-success')
-                     } else {
-                         setButtonColor('btn-danger')
-                     }
-                 } else if (event_type.startsWith('rhasspy/text-to-speech/say-text')) {
-                     payload = JSON.parse(message.payloadString)
-                     if (payload.text.length > 0) {
-                         addToChatHistory(payload.text)
-                     }
-                 }
-             }
-
-             client.connect({
-                 reconnect: true,
-                 onSuccess: function() {
-                     $('#connected').hide()
-                     subTopics.forEach(client.subscribe)
-                 }
-             })
-         }
-
-         function sendEvent(topic, payload) {
-             message = new Paho.Message(payload)
-             message.destinationName = topic
-             client.send(message)
-         }
-
          function submitChat() {
              try {
-                 setButtonColor('btn-primary')
                  var text = $("#chat-text").val()
                  if (text.length > 0) {
-                     addToChatHistory(text)
-                     sendEvent(pubTopic + siteId,
+                     setButtonColor('btn-info')
+                     sendEvent('rhasspy/intent-recognition/recognize-intent' + siteId,
                                JSON.stringify({ 'text': text }))
                  }
              } catch {
@@ -176,29 +279,17 @@
 
          function addToChatHistory(text) {
              if (text.length > 0) {
-                 $('#chat-history').append(new Option(text, ''))
-                 $('#chat-history').prop('selectedIndex', $('#chat-history').prop('length') - 1)
+                 var date = new Date()
+                 var timeString = date.getHours().toString().padStart(2, '0') + ':' +
+                                  date.getMinutes().toString().padStart(2, '0') + ':' +
+                                  date.getSeconds().toString().padStart(2, '0') + '.' +
+                                  date.getMilliseconds().toString().padStart(3, '0')
+
+                 $('#chat-history').val(function(i, currentText) {
+                     return '[' + timeString + '] ' + text + '\n' + currentText
+                 })
              }
          }
-
-         // -------------------------------------------------------------------
-
-         $('#ptt').mousedown(function(evt) {
-             setButtonColor('btn-danger')
-             sendEvent('rhasspy/speech-to-text/start-listening' + siteId, '{}')
-         })
-
-         $('#ptt').mouseup(function(evt) {
-             clearButtonColor()
-             sendEvent('rhasspy/speech-to-text/stop-listening' + siteId, '{}')
-         })
-
-         // -------------------------------------------------------------------
-
-         $(function() {
-             init()
-             connect()
-         })
 
         </script>
 

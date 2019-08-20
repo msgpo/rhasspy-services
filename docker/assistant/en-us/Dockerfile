@@ -125,7 +125,7 @@ COPY training/__init__.py ${rhasspy_dir}/training/
 COPY training/bin/rhasspy-*  /usr/bin/
 
 # pronounce
-COPY text_to_speech/espeak/bin/espeak_pronounce /usr/bin/
+COPY text_to_speech/espeak/bin/rhasspy-* /usr/bin/
 
 # -----------------------------------------------------------------------------
 # Speech To Text
