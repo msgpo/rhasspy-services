@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# MQTT wrapper around rhasspy-porcupine
+# Profile wrapper around rhasspy-porcupine
 
 if [[ -z "${rhasspy_dir}" ]]; then
     export rhasspy_dir='/usr/lib/rhasspy'
@@ -13,15 +13,6 @@ fi
 . "${rhasspy_dir}/etc/shflags"
 
 DEFINE_string 'profile' '' 'Path to profile directory' 'p'
-
-# MQTT
-DEFINE_string 'mqtt-host' '127.0.0.1' 'MQTT server address'
-DEFINE_integer 'mqtt-port' 1883 'MQTT server port'
-DEFINE_string 'mqtt-topic' 'rhasspy/wake-word/#' 'MQTT topic to subscribe to'
-
-# Audio
-DEFINE_string 'audio-host' '0.0.0.0' 'Host for UDP audio input stream'
-DEFINE_integer 'audio-port' 12200 'Port for UDP audio input stream'
 
 # porcupine
 DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
@@ -40,13 +31,6 @@ eval set -- "${FLAGS_ARGV}"
 set -e
 
 profile_dir="${FLAGS_profile}"
-
-mqtt_host="${FLAGS_mqtt_host}"
-mqtt_port="${FLAGS_mqtt_port}"
-mqtt_topic="${FLAGS_mqtt_topic}"
-
-audio_host="${FLAGS_audio_host}"
-audio_port="${FLAGS_audio_port}"
 
 library="${FLAGS_library}"
 model="${FLAGS_model}"
@@ -67,11 +51,6 @@ fi
 if [[ ! -z "${profile_dir}" ]]; then
     export profile_dir="$(realpath "${profile_dir}")"
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
-                        -q mqtt_host 'mqtt.host' "${mqtt_host}" \
-                        -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                        -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
-                        -q audio_host 'wake-word.audio-input.host' "${audio_host}" \
-                        -q audio_port 'wake-word.audio-input.port' "${audio_port}" \
                         -q auto_start 'wake-word.porcupine.auto-start' "${auto_start}" \
                         -q library 'wake-word.porcupine.library' "${library}" \
                         -q model 'wake-word.porcupine.model' "${model}" \

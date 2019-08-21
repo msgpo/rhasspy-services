@@ -63,7 +63,7 @@ if [[ ! -z "${profile_dir}" ]]; then
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                         -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                        -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
+                        -q mqtt_topic 'intent-recognition.mqtt.topic' "${mqtt_topic}" \
                         -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
                         -q skip_unknown 'intent-recognition.fsticuffs.skip-unknown' "${skip_unknown}" \
                         -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" | \

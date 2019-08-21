@@ -64,7 +64,7 @@ if [[ ! -z "${profile_dir}" ]]; then
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q mqtt_host 'mqtt.host' "${mqtt_host}" \
                         -q mqtt_port 'mqtt.port' "${mqtt_port}" \
-                        -q mqtt_topic 'mqtt.topic' "${mqtt_topic}" \
+                        -q mqtt_topic 'speech-to-text.mqtt.topic' "${mqtt_topic}" \
                         -q audio_host 'speech-to-text.audio-input.host' "${audio_host}" \
                         -q audio_port 'speech-to-text.audio-input.port' "${audio_port}" \
                         -q acoustic_model 'speech-to-text.pocketsphinx.acoustic-model' "${acoustic_model}" \

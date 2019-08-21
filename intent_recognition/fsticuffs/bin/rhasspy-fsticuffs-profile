@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# Profile wrapper around rhasspy-fsticuffs
+
 if [[ -z "${rhasspy_dir}" ]]; then
     export rhasspy_dir='/usr/lib/rhasspy'
 fi
