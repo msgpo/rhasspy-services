@@ -123,7 +123,8 @@ def main():
             in_symbols = intent_fst.input_symbols()
             for i in range(in_symbols.num_symbols()):
                 token = in_symbols.find(i).decode()
-                known_tokens.add(token)
+                if not (token.startswith("__") or token.startswith("<")):
+                    known_tokens.add(token)
 
             logger.debug(f"Skipping words outside of set: {known_tokens}")
 
@@ -133,6 +134,7 @@ def main():
             logger.debug("Fuzzy search enabled")
             intent_graph = fst_to_graph(intent_fst)
 
+            # Load stop words (words that act like wildcards for transitions)
             if args.stop_words:
                 with open(args.stop_words, "r") as stop_words_file:
                     stop_words = set([line.strip() for line in stop_words_file])
@@ -151,7 +153,7 @@ def main():
         try:
             if args.text_input:
                 topic = EVENT_RECOGNIZE
-                event = json.dumps({ "text": line })
+                event = json.dumps({"text": line})
             else:
                 # Expected <topic> <payload> on each line
                 topic, event = line.split(" ", maxsplit=1)
