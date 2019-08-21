@@ -1,0 +1,38 @@
+audio-input:
+  pulseaudio:
+    clients:
+      - 127.0.0.1:12200
+      - 127.0.0.1:12201
+      - 127.0.0.1:12202
+
+wake-word:
+    audio-input:
+        host: 127.0.0.1
+        port: 12200
+
+voice-command:
+    audio-input:
+        host: 127.0.0.1
+        port: 12201
+
+speech-to-text:
+    audio-input:
+        host: 127.0.0.1
+        port: 12202
+    pocketsphinx:
+        acoustic-model: !env "${rhasspy_dir}/languages/english/en-us_pocketsphinx-cmu/acoustic_model"
+        language-model: !env "${profile_dir}/language_model.txt"
+        dictionary: !env "${profile_dir}/dictionary.txt"
+            
+intent-recognition:
+    fsticuffs:
+        intent-fst: !env "${profile_dir}/intent.fst"
+        skip-unknown: true
+        fuzzy: true
+
+training:
+  sentences-file: !env "${profile_dir}/sentences.ini"
+  intent-fst: !env "${profile_dir}/intent.fst"
+  language-model: !env "${profile_dir}/language_model.txt"
+  dictionary: !env "${profile_dir}/dictionary.txt"
+  base-dictionary: !env "${rhasspy_dir}/languages/english/en-us_pocketsphinx-cmu/base_dictionary.txt"
