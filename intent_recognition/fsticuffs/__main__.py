@@ -87,8 +87,10 @@ def main():
 
     # File to read events from
     events_in_file = sys.stdin
+    is_stdin = True
     if args.events_in_file and (args.events_in_file != "-"):
         events_in_file = open(args.events_in_file, "r")
+        is_stdin = False
 
     # File to write events to
     events_out_file = sys.stdout
@@ -152,8 +154,13 @@ def main():
 
         try:
             if args.text_input:
+                # Assume text input
                 topic = EVENT_RECOGNIZE
                 event = json.dumps({"text": line})
+            elif is_stdin:
+                # Assume JSON input
+                topic = EVENT_RECOGNIZE
+                event = line
             else:
                 # Expected <topic> <payload> on each line
                 topic, event = line.split(" ", maxsplit=1)

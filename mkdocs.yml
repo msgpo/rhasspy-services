@@ -1,0 +1,11 @@
+site_name: Rhasspy
+theme: material
+nav:
+  - Home: index.md
+  - Install: install.md
+  - Customize: customize.md
+  - Tools: tools.md
+  - Reference: reference.md
+  - About: about.md
+markdown_extensions:
+  - codehilite
