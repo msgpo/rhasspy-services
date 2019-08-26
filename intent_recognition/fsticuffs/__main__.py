@@ -73,6 +73,11 @@ def main():
         help="Input is text instead of events + JSON",
     )
     parser.add_argument(
+        "--no-topic",
+        action="store_true",
+        help="Input events do not contain a topic (recognize-intent event is assumed)",
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
 
@@ -87,10 +92,8 @@ def main():
 
     # File to read events from
     events_in_file = sys.stdin
-    is_stdin = True
     if args.events_in_file and (args.events_in_file != "-"):
         events_in_file = open(args.events_in_file, "r")
-        is_stdin = False
 
     # File to write events to
     events_out_file = sys.stdout
@@ -157,8 +160,8 @@ def main():
                 # Assume text input
                 topic = EVENT_RECOGNIZE
                 event = json.dumps({"text": line})
-            elif is_stdin:
-                # Assume JSON input
+            elif args.no_topic:
+                # Assume JSON input with no topic
                 topic = EVENT_RECOGNIZE
                 event = line
             else:

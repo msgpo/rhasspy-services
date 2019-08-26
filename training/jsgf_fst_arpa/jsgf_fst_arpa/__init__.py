@@ -10,7 +10,6 @@ import tempfile
 import time
 from typing import Optional, Set
 
-from jsgf import parser as jsgf_parser
 from jsgf2fst import jsgf2fst, read_slots, make_intent_fst, fst2arpa
 
 
@@ -47,8 +46,7 @@ def make_fst(
                 logging.debug(f"Skipping {f_name} (not in whitelist)")
                 continue
 
-        logging.debug(f"Parsing JSGF grammar {f_name}")
-        grammar = jsgf_parser.parse_grammar_file(os.path.join(grammar_dir, f_name))
+        grammar = os.path.join(grammar_dir, f_name)
         grammars.append(grammar)
 
     # Generate FSTs
