@@ -7,15 +7,18 @@ import os
 import re
 import sys
 import configparser
-
-from typing import TextIO, List
+from typing import TextIO, List, Iterable, Optional
+from pathlib import Path
 
 
 def make_grammars(
-    ini_file: TextIO, grammar_dir: str, no_overwrite: bool = False
-) -> List[str]:
+    ini_file: TextIO,
+    grammar_dir: Path,
+    whitelist: Optional[Iterable[str]] = None,
+    no_overwrite: bool = False,
+) -> List[Path]:
     # Create output directory
-    os.makedirs(grammar_dir, exist_ok=True)
+    grammar_dir.mkdir(parents=True, exist_ok=True)
 
     # Create ini parser
     config = configparser.ConfigParser(
@@ -31,6 +34,10 @@ def make_grammars(
     grammar_rules = {}
 
     for sec_name in config.sections():
+        if (whitelist is not None) and (sec_name not in whitelist):
+            logger.debug(f"Skipping {sec_name} (not in whitelist)")
+            continue
+
         sentences: List[str] = []
         rules: List[str] = []
         for k, v in config[sec_name].items():
@@ -52,11 +59,11 @@ def make_grammars(
         grammar_rules[sec_name] = rules
 
     # Write JSGF grammars
-    grammar_paths = []
+    grammar_paths: List[Path] = []
     for name, rules in grammar_rules.items():
-        grammar_path = os.path.join(grammar_dir, "{0}.gram".format(name))
+        grammar_path = grammar_dir / f"{name}.gram"
 
-        if os.path.exists(grammar_path) and no_overwrite:
+        if grammar_path.exists() and no_overwrite:
             logger.debug(f"Skipping {grammar_path}")
             continue
 
