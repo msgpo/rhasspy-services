@@ -19,7 +19,6 @@ from jsgf2fst.jsgf2fst import (
     grammar_dependencies,
     grammar_to_fsts,
     slot_to_grammar,
-    replace_tag_symbols,
     make_intent_fst,
 )
 
@@ -183,7 +182,6 @@ def make_grammar_fsts(grammar_path: Path, replace_fsts: Dict[str, Path], targets
 
         if rule_name == main_rule:
             grammar_fst_path = fsts_dir / f"{grammar_name}.fst"
-            grammar_fst = replace_tag_symbols(rule_fst, eps=eps)
             grammar_fst.write(str(grammar_fst_path))
 
 

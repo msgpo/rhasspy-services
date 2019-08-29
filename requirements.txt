@@ -6,3 +6,6 @@ pyinstaller
 paho-mqtt
 networkx
 doit
+openfst==1.6.9
+antlr4-python3-runtime
+networkx
