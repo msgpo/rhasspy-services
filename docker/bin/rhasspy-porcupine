@@ -4,6 +4,6 @@ docker run -i \
        -v "${HOME}:${HOME}" \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
-       --entrypoint porcupine \
+       --entrypoint rhasspy-porcupine \
        rhasspy/wake-word/porcupine \
        "$@"

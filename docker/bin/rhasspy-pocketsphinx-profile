@@ -4,6 +4,6 @@ docker run -i \
        -v "${HOME}:${HOME}" \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
-       --entrypoint pocketsphinx-profile \
+       --entrypoint rhasspy-pocketsphinx-profile \
        rhasspy/speech-to-text/pocketsphinx \
        "$@"

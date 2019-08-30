@@ -4,6 +4,6 @@ docker run -i \
        -v "${HOME}:${HOME}" \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
-       --entrypoint rhasspy-vocab_dict \
+       --entrypoint rhasspy-train \
        rhasspy/training \
        "$@"

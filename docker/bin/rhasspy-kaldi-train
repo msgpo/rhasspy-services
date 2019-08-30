@@ -4,6 +4,6 @@ docker run -i \
        -v "${HOME}:${HOME}" \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
-       --entrypoint kaldi-train \
+       --entrypoint rhasspy-kaldi-train \
        rhasspy/speech-to-text/kaldi \
        "$@"

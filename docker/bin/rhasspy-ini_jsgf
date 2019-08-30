@@ -4,6 +4,6 @@ docker run -i \
        -v "${HOME}:${HOME}" \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
-       --entrypoint ini_jsgf \
+       --entrypoint rhasspy-ini_jsgf \
        rhasspy/training \
        "$@"

@@ -4,6 +4,6 @@ docker run -i \
        -v "${HOME}:${HOME}" \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
-       --entrypoint jsgf_fst_arpa \
+       --entrypoint rhasspy-jsgf2fst \
        rhasspy/training \
        "$@"

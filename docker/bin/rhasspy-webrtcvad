@@ -4,6 +4,6 @@ docker run -i \
        -v "${HOME}:${HOME}" \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
-       --entrypoint webrtcvad \
+       --entrypoint rhasspy-webrtcvad \
        rhasspy/voice-command/webrtcvad \
        "$@"

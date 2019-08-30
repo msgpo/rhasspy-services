@@ -5,7 +5,7 @@ docker run -it \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
        --device /dev/snd \
-       --entrypoint espeak_pronounce \
+       --entrypoint rhasspy-pronounce \
        rhasspy/training \
        --play-program 'aplay' \
        "$@"

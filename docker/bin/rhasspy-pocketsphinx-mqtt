@@ -5,6 +5,6 @@ docker run -it \
        -v /etc/localtime:/etc/localtime:ro \
        -w "${PWD}" \
        --network host \
-       --entrypoint mqtt \
+       --entrypoint rhasspy-pocketsphinx-mqtt \
        rhasspy/speech-to-text/pocketsphinx \
        "$@"

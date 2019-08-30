@@ -62,7 +62,7 @@ RUN ln -s /usr/lib/libfstfarscript.so /usr/lib/libfstfarscript.so.13 && \
     ln -s /usr/lib/libfstscript.so /usr/lib/libfstscript.so.13 && \
     ln -s /usr/lib/libfstfar.so /usr/lib/libfstfar.so.13 && \
     ln -s /usr/lib/libfst.so /usr/lib/libfst.so.13 && \
-    ln -s /usr/lib/libngram.so /usr/lib/libngram.so.134 && \
+    ln -s /usr/lib/libngram.so /usr/lib/libngram.so.134
 
 # -----------------------------------------------------------------------------
 
