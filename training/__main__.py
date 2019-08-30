@@ -5,7 +5,7 @@ import sys
 import argparse
 import logging
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Set, Iterable
 from collections import deque
 
 import yaml
@@ -14,15 +14,15 @@ import pywrapfst as fst
 import doit
 from doit import create_after
 
-from jsgf2fst.jsgf2fst import (
-    get_parser,
-    grammar_dependencies,
+from training.jsgf2fst import (
+    get_grammar_dependencies,
     grammar_to_fsts,
-    slot_to_grammar,
+    slots_to_fsts,
     make_intent_fst,
 )
 
 from training.ini_jsgf import make_grammars
+from training.vocab_dict import make_dict
 
 logger = logging.getLogger("rhasspy_train")
 logging.basicConfig(level=logging.DEBUG)
@@ -89,15 +89,6 @@ for dir_path in [grammar_dir, fsts_dir]:
 # Set of used intents
 intents: Set[str] = set()
 
-# Shared symbol tables
-eps = "<eps>"
-
-input_symbols = fst.SymbolTable()
-input_symbols.add_symbol(eps)
-
-output_symbols = fst.SymbolTable()
-output_symbols.add_symbol(eps)
-
 # -----------------------------------------------------------------------------
 
 
@@ -138,51 +129,32 @@ def task_grammars():
 # -----------------------------------------------------------------------------
 
 
-def make_slot_fst(slot_grammar: str, targets):
-    grammar_name, slot_fsts = grammar_to_fsts(
-        slot_grammar,
-        input_symbols=input_symbols,
-        output_symbols=output_symbols,
-        eps=eps,
-    )
-
-    main_rule = grammar_name + "." + grammar_name
-    slot_fst = slot_fsts[main_rule]
-
-    slot_fst.write(targets[0])
+def do_slots_to_fst(slot_names, targets):
+    slot_fsts = slots_to_fsts(slots_dir, slot_names=slot_names)
+    for slot_name, slot_fst in slot_fsts.items():
+        # Slot name will already have "$"
+        slot_fst.write(str(fsts_dir / f"{slot_name}.fst"))
 
 
-def make_grammar_fsts(grammar_path: Path, replace_fsts: Dict[str, Path], targets):
+def do_grammar_to_fsts(grammar_path: Path, replace_fst_paths: Dict[str, Path], targets):
+    # Load dependent FSTs
+    replace_fsts = {
+        replace_name: fst.Fst.read(str(replace_path))
+        for replace_name, replace_path in replace_fst_paths.items()
+    }
+
     grammar = grammar_path.read_text()
-    grammar_name, grammar_fsts = grammar_to_fsts(
-        grammar, input_symbols=input_symbols, output_symbols=output_symbols, eps=eps
-    )
+    listener = grammar_to_fsts(grammar, replace_fsts=replace_fsts)
+    grammar_name = listener.grammar_name
 
-    main_rule = grammar_name + "." + grammar_name
-
-    for replace_name, fst_path in replace_fsts.items():
-        replace_fst = fst.Fst.read(str(fst_path))
-
-        for i in range(input_symbols.num_symbols()):
-            s1 = input_symbols.find(i).decode()
-            s2 = replace_fst.input_symbols().find(i).decode()
-            assert s1 == s2, (i, s1, s2)
-
-        replace_symbol = "__replace__" + replace_name
-        replace_idx = input_symbols.find(replace_symbol)
-        if replace_idx >= 0:
-            grammar_fsts[main_rule] = fst.replace(
-                [(-1, grammar_fsts[main_rule]), (replace_idx, replace_fst)],
-                epsilon_on_replace=True,
-            )
-
-    for rule_name, rule_fst in grammar_fsts.items():
+    # Write FST for each JSGF rule
+    for rule_name, rule_fst in listener.fsts.items():
         fst_path = fsts_dir / f"{rule_name}.fst"
         rule_fst.write(str(fst_path))
 
-        if rule_name == main_rule:
-            grammar_fst_path = fsts_dir / f"{grammar_name}.fst"
-            grammar_fst.write(str(grammar_fst_path))
+    # Write FST for main grammar rule
+    grammar_fst_path = fsts_dir / f"{grammar_name}.fst"
+    listener.grammar_fst.write(str(grammar_fst_path))
 
 
 # -----------------------------------------------------------------------------
@@ -193,113 +165,70 @@ def task_grammar_fsts():
     """Creates grammar FSTs from JSGF grammars and relevant slots."""
     tasks = []
     used_slots: Set[str] = set()
-    input_words: Set[str] = set()
-    output_words: Set[str] = set()
 
     for intent in intents:
         grammar_path = grammar_dir / f"{intent}.gram"
         grammar = grammar_path.read_text()
-        grammar_deps = grammar_dependencies(grammar)
+        grammar_deps = get_grammar_dependencies(grammar)
 
-        rule_names = []
-
-        # Add vocabulary to shared symbol tables
-        input_words.update(grammar_deps.input_words)
-        output_words.update(grammar_deps.output_words)
+        rule_names: Set[str] = set()
+        replace_fst_paths: Dict[str, Path] = {}
 
         # Process dependencies
-        replace_fsts: Dict[str, Path] = {}
         for node, data in grammar_deps.graph.nodes(data=True):
-            if data["type"] == "slot":
-                slot_name = node
-                if slot_name in used_slots:
-                    continue
+            node_type = data["type"]
 
-                slot_path = slots_dir / slot_name
-                slot_grammar = slot_to_grammar(slots_dir, slot_name)
-                slot_grammar_deps = grammar_dependencies(slot_grammar)
+            if node_type == "slot":
+                # Strip "$"
+                slot_name = node[1:]
+                used_slots.add(slot_name)
 
-                # Add vocabulary to shared symbol tables
-                input_words.update(slot_grammar_deps.input_words)
-                output_words.update(slot_grammar_deps.output_words)
-
-                # JSGF -> FST
-                slot_fst_path = fsts_dir / f"{slot_name}.slot.fst"
-                tasks.append(
-                    {
-                        "name": slot_name + "_fst",
-                        "file_dep": [slot_path],
-                        "targets": [slot_fst_path],
-                        "actions": [(make_slot_fst, [slot_grammar])],
-                    }
-                )
-
-                replace_fsts["$" + slot_name] = slot_fst_path
-
-            elif (data["type"] == "grammar") and (node != intent):
-                # Grammar dependency
-                sub_grammar_name = node
-                sub_rule = sub_grammar_name + "." + sub_grammar_name
-                sub_fst_path = fsts_dir / f"{sub_rule}.fst"
-                replace_fsts[sub_rule] = sub_fst_path
-            elif data["type"] == "rule":
-                # Rule dependency
-                rule_names.append(node)
-            elif data["type"] == "reference":
-                rule_name = node
-                rule_grammar = rule_name.split(".", maxsplit=1)[0]
-                if rule_grammar != intent:
-                    # Rule dependency from other grammar
-                    replace_fsts[rule_name] = fsts_dir / f"{rule_name}.fst"
+                # Path to slot FST
+                replace_fst_paths[node] = fsts_dir / f"{node}.fst"
+            elif node_type == "remote rule":
+                # Path to rule FST
+                replace_fst_paths[node] = fsts_dir / f"{node}.fst"
+            elif node_type == "local rule":
+                rule_names.add(node)
 
         # All rule/grammar FSTs that will be generated
         grammar_fst_paths = [fsts_dir / f"{rule_name}.fst" for rule_name in rule_names]
         grammar_fst_paths.append(fsts_dir / f"{intent}.fst")
 
-        tasks.append(
-            {
-                "name": intent + "_fst",
-                "file_dep": [grammar_path] + list(replace_fsts.values()),
-                "targets": grammar_fst_paths,
-                "actions": [(make_grammar_fsts, [grammar_path, replace_fsts])],
-            }
-        )
+        yield {
+            "name": intent + "_fst",
+            "file_dep": [grammar_path] + list(replace_fst_paths.values()),
+            "targets": grammar_fst_paths,
+            "actions": [(do_grammar_to_fsts, [grammar_path, replace_fst_paths])],
+        }
 
-    # Construct shared symbol tables
-    for word in sorted(input_words):
-        input_symbols.add_symbol(word)
-
-    for word in sorted(output_words):
-        output_symbols.add_symbol(word)
-
-    # Start tasks *after* symbol tables have been generated
-    for task in tasks:
-        yield task
+    # slots -> FST
+    yield {
+        "name": "slot_fsts",
+        "file_dep": [slots_dir / slot_name for slot_name in used_slots],
+        "targets": [fsts_dir / f"${slot_name}.fst" for slot_name in used_slots],
+        "actions": [(do_slots_to_fst, [used_slots])],
+    }
 
 
 # -----------------------------------------------------------------------------
 
 
+def do_intent_fst(intents: Iterable[str], targets):
+    intent_fsts = {
+        intent: fst.Fst.read(str(fsts_dir / f"{intent}.fst")) for intent in intents
+    }
+    intent_fst = make_intent_fst(intent_fsts)
+    intent_fst.write(targets[0])
+
+
 @create_after(executed="grammars")
 def task_intent_fst():
     """Merges grammar FSTs into single intent.fst."""
-    fst_paths = {intent: fsts_dir / f"{intent}.fst" for intent in intents}
     return {
-        "file_dep": list(fst_paths.values()),
+        "file_dep": [fsts_dir / f"{intent}.fst" for intent in intents],
         "targets": [intent_fst],
-        "actions": [
-            (
-                lambda targets: make_intent_fst(
-                    {
-                        intent: fst.Fst.read(str(fst_paths[intent]))
-                        for intent in intents
-                    },
-                    input_symbols,
-                    output_symbols,
-                    eps=eps,
-                ).write(targets[0])
-            )
-        ],
+        "actions": [(do_intent_fst, [intents])],
     }
 
 
@@ -338,49 +267,38 @@ def task_language_model():
 # -----------------------------------------------------------------------------
 
 
+def do_vocab(targets):
+    with open(targets[0], "w") as vocab_file:
+        input_symbols = fst.Fst.read(str(intent_fst)).input_symbols()
+        for i in range(input_symbols.num_symbols()):
+            symbol = input_symbols.find(i).decode().strip()
+            if not (symbol.startswith("__") or symbol.startswith("<")):
+                print(symbol, file=vocab_file)
+
+
 def task_vocab():
     """Writes all vocabulary words to a file from intent.fst."""
-    def make_vocab(targets):
-        with open(targets[0], "w") as vocab_file:
-            input_symbols = fst.Fst.read(str(intent_fst)).input_symbols()
-            for i in range(input_symbols.num_symbols()):
-                symbol = input_symbols.find(i).decode().strip()
-                if not (symbol.startswith("__") or symbol.startswith("<")):
-                    print(symbol, file=vocab_file)
-
-    return {"file_dep": [intent_fst], "targets": [vocab], "actions": [make_vocab]}
+    return {"file_dep": [intent_fst], "targets": [vocab], "actions": [do_vocab]}
 
 
 # -----------------------------------------------------------------------------
 
 
+def do_dict(dictionary_paths: Iterable[Path], targets):
+    with open(targets[0], "w") as dictionary_file:
+        make_dict(vocab, dictionary_paths, dictionary_file, unknown_path=unknown_words)
+
+
 def task_vocab_dict():
     """Creates custom pronunciation dictionary based on desired vocabulary."""
-    extra_deps = []
-    extra_args = []
+    dictionary_paths = [base_dictionary]
     if custom_words.exists():
-        extra_deps.append(custom_words)
-        extra_args.extend(["--dictionary", custom_words])
+        dictionary_paths.append(custom_words)
 
     return {
-        "file_dep": [vocab, base_dictionary] + extra_deps,
+        "file_dep": [vocab] + dictionary_paths,
         "targets": [dictionary],
-        "actions": [
-            ["rm", "-f", unknown_words],
-            [
-                "rhasspy-vocab_dict",
-                "--vocab",
-                vocab,
-                "--dictionary",
-                base_dictionary,
-                "--unknown",
-                unknown_words,
-                "--output",
-                dictionary,
-                " --debug",
-            ]
-            + extra_args,
-        ],
+        "actions": [["rm", "-f", unknown_words], (do_dict, [dictionary_paths])],
     }
 
 

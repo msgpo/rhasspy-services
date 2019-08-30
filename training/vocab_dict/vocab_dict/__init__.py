@@ -6,14 +6,15 @@ logger = logging.getLogger("vocab_dict")
 import os
 import re
 import sys
+from pathlib import Path
 from typing import Iterable, Optional, List, Dict, Callable, TextIO
 
 
 def make_dict(
-    vocab_path: str,
-    dictionary_paths: List[str],
+    vocab_path: Path,
+    dictionary_paths: Iterable[Path],
     dictionary_file: TextIO,
-    unknown_path: Optional[str] = None,
+    unknown_path: Optional[Path] = None,
     upper: bool = False,
     lower: bool = False,
     no_number: bool = False,
