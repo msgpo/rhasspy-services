@@ -90,7 +90,7 @@ installer-train:
 	bash build.sh installer/training/ini_jsgf.spec
 	bash build.sh installer/training/vocab_g2p.spec
 	bash build.sh installer/training/vocab_dict.spec
-	bash build.sh installer/training/jsgf_fst_arpa.spec
+	bash build.sh installer/training/jsgf2fst.spec
 	bash build.sh installer/training/train.spec
 
 installer-webrtcvad:
@@ -147,7 +147,7 @@ debian-push-to-talk:
 	cd debian/user_interface && fakeroot dpkg --build rhasspy-push-to-talk_1.0_all
 
 debian-train: installer-train
-	rsync -av dist/ini_jsgf/ dist/vocab_g2p/ dist/vocab_dict/ dist/jsgf_fst_arpa/ dist/train/
+	rsync -av dist/ini_jsgf/ dist/vocab_g2p/ dist/vocab_dict/ dist/jsgf2fst/ dist/train/
 	bash debianize.sh training train $(FRIENDLY_ARCH)
 
 debian-utils: installer-utils

@@ -3,4 +3,7 @@ from .jsgf2fst import (
     grammar_to_fsts,
     slots_to_fsts,
     make_intent_fst,
+    symbols2intent,
+    fstaccept,
+    fstprintall,
 )

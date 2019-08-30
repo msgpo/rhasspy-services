@@ -280,50 +280,6 @@ fi
 cp -R "${phonetisaurus_dir}"/build/bin/* "${venv}/bin/"
 
 # -----------------------------------------------------------------------------
-# sphinxbase
-# -----------------------------------------------------------------------------
-
-sphinxbase_dir="${build_dir}/sphinxbase-master"
-if [[ ! -d "${sphinxbase_dir}/build" ]]; then
-    echo "Installing sphinxbase"
-    sphinxbase_file="${download_dir}/sphinxbase.tar.gz"
-
-    if [[ ! -f "${sphinxbase_file}" ]]; then
-        sphinxbase_url='https://github.com/cmusphinx/sphinxbase/master.tar.gz'
-        echo "Downloading sphinxbase (${sphinxbase_url})"
-        download "${sphinxbase_url}" "${sphinxbase_file}"
-    fi
-
-    tar -C "${build_dir}" -xf "${sphinxbase_file}" && \
-        cd "${sphinxbase_dir}" && \
-        ./autogen.sh  "--prefix=${sphinxbase_dir}/build" && \
-        ./autogen.sh  "--prefix=${sphinxbase_dir}/build" && \
-        make -j "${make_threads}" && \
-        make install
-fi
-
-# Copy build artifacts into virtual environment
-cp -R "${sphinxbase_dir}"/build/bin/* "${venv}/bin/"
-cp -R "${sphinxbase_dir}"/build/lib/*.so* "${venv}/lib/"
-
-
-# -----------------------------------------------------------------------------
-# jsgf2fst
-# -----------------------------------------------------------------------------
-
-jsgf2fst_file="${download_dir}/jsgf2fst-0.2.0.tar.gz"
-if [[ ! -f "${jsgf2fst_file}" ]]; then
-    jsgf2fst_url='https://github.com/synesthesiam/jsgf2fst/releases/download/v0.1.0/jsgf2fst-0.2.0.tar.gz'
-    echo "Downloading jsgf2fst (${jsgf2fst_url})"
-    download "${jsgf2fst_url}" "${jsgf2fst_file}"
-fi
-
-# Install using built libraries
-python3 -m pip install \
-        --global-option=build_ext --global-option="-L${venv}/lib" \
-        "${jsgf2fst_file}"
-
-# -----------------------------------------------------------------------------
 # kaldi
 # -----------------------------------------------------------------------------
 
@@ -354,7 +310,9 @@ fi
 # Python requirements
 # -----------------------------------------------------------------------------
 
-python3 -m pip install -r "${this_dir}/requirements.txt"
+python3 -m pip install \
+        --global-option=build_ext --global-option="-L${venv}/lib" \
+        -r "${this_dir}/requirements.txt"
 
 # -----------------------------------------------------------------------------
 

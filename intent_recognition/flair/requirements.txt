@@ -1,4 +1,4 @@
 flair
-jsgf2fst==0.1.2
+openfst==1.6.9
 paramiko
 apex

@@ -3,28 +3,29 @@ import logging
 
 logger = logging.getLogger("jsgf2fst")
 
+import sys
 import argparse
+import json
+from pathlib import Path
 
-from .jsgf2fst import make_intent_fst
+import networkx as nx
+import pywrapfst as fst
+
+from .jsgf2fst import grammar_to_fsts
 
 
 def main():
     parser = argparse.ArgumentParser("jsgf2fst")
     parser.add_argument(
-        "--grammar-dir", required=True, help="Input directory with JSGF grammars"
+        "--replace-fst",
+        nargs=2,
+        action="append",
+        default=[],
+        help="Name and FST path to replace",
     )
     parser.add_argument(
-        "--fst", required=True, help="Path to write intent finite state transducer"
+        "--fsts-dir", help="Output directory for finite state transducers"
     )
-    parser.add_argument(
-        "--arpa", required=True, help="Path to write ARPA language model"
-    )
-    parser.add_argument("--vocab", help="Path to write vocabulary")
-    parser.add_argument(
-        "--fst-dir", help="Output directory for finite state transducers"
-    )
-    parser.add_argument("--slots-dir", help="Directory with slot value files")
-    parser.add_argument("--whitelist", help="File with grammar names to process")
     parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to the console"
     )
@@ -33,20 +34,29 @@ def main():
     if args.debug:
         logging.basicConfig(level=logging.DEBUG)
 
-    whitelist = None
-    if args.whitelist:
-        with open(args.whitelist, "r") as whitelist_file:
-            whitelist = set([line.strip() for line in whitelist_file])
+    logger.debug(args)
 
-    make_fst(
-        args.grammar_dir,
-        args.fst,
-        arpa_path=args.arpa,
-        vocab_path=args.vocab,
-        fst_dir=args.fst_dir,
-        slots_dir=args.slots_dir,
-        grammar_whitelist=whitelist,
-    )
+    # JSGF grammar from stdin
+    grammar = sys.stdin.read()
+
+    # Load FST replacements
+    replace_fsts: Dict[str, fst.Fst] = {n: fst.Fst.read(p) for n, p in args.replace_fst}
+
+    # Parse grammar
+    logger.debug("Parsing grammar")
+    listener = grammar_to_fsts(grammar, replace_fsts=replace_fsts)
+
+    if args.fsts_dir:
+        # Output FSTs
+        fsts_dir = Path(args.fsts_dir)
+
+        # Write FST for each rule
+        for rule_name, rule_fst in listener.fsts.items():
+            fst_path = fsts_dir / f"{rule_name}.fst"
+            rule_fst.write(str(fst_path))
+            logger.debug(f"Wrote {fst_path}")
+
+    json.dump(nx.readwrite.json_graph.node_link_data(listener.graph), sys.stdout)
 
 
 # -----------------------------------------------------------------------------

@@ -13,7 +13,7 @@ setuptools.setup(
     url="https://github.com/synesthesiam/rhasspy-services",
     packages=setuptools.find_packages(),
     package_data={"fsticuffs": ["py.typed"]},
-    install_requires=["jsonlines", "pyyaml", "pydash", "jsgf2fst==0.1.1"],
+    install_requires=["jsonlines", "pyyaml", "pydash", "openfst==1.6.9"],
     classifiers=["Programming Language :: Python :: 3"],
     long_description=long_description,
     long_description_content_type="text/markdown",

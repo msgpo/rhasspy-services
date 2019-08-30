@@ -31,15 +31,6 @@ RUN tar -xf phonetisaurus-2019.tar.gz && \
     make -j $MAKE_THREADS && \
     make install
 
-# sphinxbase
-RUN apk add swig
-COPY download/sphinxbase.tar.gz /
-RUN tar -xf /sphinxbase.tar.gz && \
-    cd /sphinxbase-master && \
-    ./autogen.sh --prefix=/build && \
-    make -j $MAKE_THREADS && \
-    make install
-
 # espeak-ng
 COPY download/espeak-ng-1.49.2.tar.gz /
 RUN tar -xf /espeak-ng-1.49.2.tar.gz && \
@@ -73,12 +64,7 @@ RUN ln -s /usr/lib/libfstfarscript.so /usr/lib/libfstfarscript.so.13 && \
     ln -s /usr/lib/libfstfar.so /usr/lib/libfstfar.so.13 && \
     ln -s /usr/lib/libfst.so /usr/lib/libfst.so.13 && \
     ln -s /usr/lib/libngram.so /usr/lib/libngram.so.134 && \
-    ln -s /usr/lib/libsphinxbase.so /usr/lib/libsphinxbase.so.3 && \
     ln -s /usr/lib/libespeak-ng.so /usr/lib/libespeak-ng.so.1
-
-# jsgf2fst
-COPY download/jsgf2fst-0.1.2.tar.gz /download/
-RUN python3 -m pip install --no-cache-dir download/jsgf2fst-0.1.2.tar.gz
 
 ARG PY_DIR=training
 
@@ -95,12 +81,12 @@ COPY ${PY_DIR}/ini_jsgf/__init__.py ${PY_DIR}/ini_jsgf/__main__.py \
 COPY ${PY_DIR}/ini_jsgf/ini_jsgf /usr/lib/rhasspy/${PY_DIR}/ini_jsgf/ini_jsgf/
 COPY ${PY_DIR}/ini_jsgf/bin/rhasspy-ini_jsgf /usr/bin/
 
-# jsgf_fst_arpa
-COPY ${PY_DIR}/jsgf_fst_arpa/__init__.py ${PY_DIR}/jsgf_fst_arpa/__main__.py \
-     /usr/lib/rhasspy/${PY_DIR}/jsgf_fst_arpa/
+# jsgf2fst
+COPY ${PY_DIR}/jsgf2fst/__init__.py ${PY_DIR}/jsgf2fst/__main__.py \
+     /usr/lib/rhasspy/${PY_DIR}/jsgf2fst/
 
-COPY ${PY_DIR}/jsgf_fst_arpa/jsgf_fst_arpa /usr/lib/rhasspy/${PY_DIR}/jsgf_fst_arpa/jsgf_fst_arpa/
-COPY ${PY_DIR}/jsgf_fst_arpa/bin/rhasspy-jsgf_fst_arpa /usr/bin/
+COPY ${PY_DIR}/jsgf2fst/jsgf2fst /usr/lib/rhasspy/${PY_DIR}/jsgf2fst/jsgf2fst/
+COPY ${PY_DIR}/jsgf2fst/bin/rhasspy-jsgf2fst /usr/bin/
 
 # vocab_dict
 COPY ${PY_DIR}/vocab_dict/__init__.py ${PY_DIR}/vocab_dict/__main__.py \
@@ -117,10 +103,10 @@ COPY ${PY_DIR}/vocab_g2p/bin/rhasspy-vocab_g2p  /usr/bin/
 
 # train
 COPY ${PY_DIR}/__init__.py /usr/lib/rhasspy/${PY_DIR}/
-COPY ${PY_DIR}/bin/rhasspy-*  /usr/bin/
+COPY ${PY_DIR}/bin/rhasspy-* /usr/bin/
 
 # pronounce
-COPY text_to_speech/espeak/bin/espeak_pronounce /usr/bin/
+COPY text_to_speech/espeak/bin/rhasspy-* /usr/bin/
 
 ENV PYTHONPATH=/usr/lib/rhasspy
 

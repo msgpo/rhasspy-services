@@ -22,9 +22,6 @@ COPY --from=builder /build/bin/* /usr/bin/
 COPY --from=builder /build/lib/*.so* /usr/lib/
 COPY --from=builder /build/include/ /usr/include/
 
-COPY download/jsgf2fst-0.1.2.tar.gz /download/
-RUN python3 -m pip install --no-cache-dir download/jsgf2fst-0.1.2.tar.gz
-
 ARG PY_DIR=intent_recognition/fsticuffs
 
 COPY ${PY_DIR}/requirements.txt /

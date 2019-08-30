@@ -32,14 +32,6 @@ RUN tar -xf phonetisaurus-2019.tar.gz && \
     make -j $MAKE_THREADS && \
     make install
 
-# sphinxbase
-RUN apt-get install -y swig
-COPY download/sphinxbase.tar.gz /
-RUN tar -xf /sphinxbase.tar.gz && \
-    cd /sphinxbase-master && \
-    ./autogen.sh --prefix=/build && \
-    make -j $MAKE_THREADS && \
-    make install
 # -----------------------------------------------------------------------------
 
 FROM python:3.6-slim-stretch
@@ -49,7 +41,6 @@ RUN apt-get update && \
         build-essential \
         python3-dev \
         mosquitto-clients \
-        sphinxbase-utils \
         espeak-ng \
         swig \
         netcat \
@@ -72,7 +63,6 @@ RUN ln -s /usr/lib/libfstfarscript.so /usr/lib/libfstfarscript.so.13 && \
     ln -s /usr/lib/libfstfar.so /usr/lib/libfstfar.so.13 && \
     ln -s /usr/lib/libfst.so /usr/lib/libfst.so.13 && \
     ln -s /usr/lib/libngram.so /usr/lib/libngram.so.134 && \
-    ln -s /usr/lib/libsphinxbase.so /usr/lib/libsphinxbase.so.3
 
 # -----------------------------------------------------------------------------
 
@@ -86,10 +76,6 @@ COPY etc/shflags ${rhasspy_dir}/etc/
 # Training
 # -----------------------------------------------------------------------------
 
-# jsgf2fst
-COPY download/jsgf2fst-0.1.2.tar.gz /download/
-RUN python3 -m pip install --no-cache-dir download/jsgf2fst-0.1.2.tar.gz
-
 COPY training/requirements.txt /requirements.training.txt
 RUN python3 -m pip install --no-cache-dir -r /requirements.training.txt
 
@@ -100,12 +86,12 @@ COPY training/ini_jsgf/__init__.py training/ini_jsgf/__main__.py \
 COPY training/ini_jsgf/ini_jsgf ${rhasspy_dir}/training/ini_jsgf/ini_jsgf/
 COPY training/ini_jsgf/bin/rhasspy-ini_jsgf /usr/bin/
 
-# jsgf_fst_arpa
-COPY training/jsgf_fst_arpa/__init__.py training/jsgf_fst_arpa/__main__.py \
-     ${rhasspy_dir}/training/jsgf_fst_arpa/
+# jsgf2fst
+COPY training/jsgf2fst/__init__.py training/jsgf2fst/__main__.py \
+     ${rhasspy_dir}/training/jsgf2fst/
 
-COPY training/jsgf_fst_arpa/jsgf_fst_arpa ${rhasspy_dir}/training/jsgf_fst_arpa/jsgf_fst_arpa/
-COPY training/jsgf_fst_arpa/bin/rhasspy-jsgf_fst_arpa /usr/bin/
+COPY training/jsgf2fst/jsgf2fst ${rhasspy_dir}/training/jsgf2fst/jsgf2fst/
+COPY training/jsgf2fst/bin/rhasspy-jsgf2fst /usr/bin/
 
 # vocab_dict
 COPY training/vocab_dict/__init__.py training/vocab_dict/__main__.py \
@@ -154,9 +140,6 @@ COPY speech_to_text/pocketsphinx/pocketsphinx_rhasspy/ \
 # -----------------------------------------------------------------------------
 # Intent Recognition
 # -----------------------------------------------------------------------------
-
-COPY download/jsgf2fst-0.1.2.tar.gz /download/
-RUN python3 -m pip install --no-cache-dir download/jsgf2fst-0.1.2.tar.gz
 
 COPY intent_recognition/fsticuffs/requirements.txt /requirements.fsticuffs.txt
 RUN python3 -m pip install --no-cache-dir -r /requirements.fsticuffs.txt

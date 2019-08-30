@@ -9,4 +9,4 @@ train_dir="${rhasspy_dir}/train"
 export PATH="${train_dir}:${PATH}"
 export LD_LIBRARY_PATH="${train_dir}:${LD_LIBRARY_PATH}"
 
-"${train_dir}/jsgf_fst_arpa" "$@"
+"${train_dir}/jsgf2fst" "$@"

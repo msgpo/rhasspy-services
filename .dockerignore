@@ -48,9 +48,9 @@
 !training/ini_jsgf/bin/
 !training/ini_jsgf/ini_jsgf/*.py
 
-!training/jsgf_fst_arpa/*.py
-!training/jsgf_fst_arpa/bin/
-!training/jsgf_fst_arpa/jsgf_fst_arpa/*.py
+!training/jsgf2fst/*.py
+!training/jsgf2fst/bin/
+!training/jsgf2fst/jsgf2fst/*.py
 
 !training/vocab_dict/*.py
 !training/vocab_dict/bin/

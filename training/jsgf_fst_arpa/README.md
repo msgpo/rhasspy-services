@@ -1,1 +1,0 @@
-# JSGF FST ARPA

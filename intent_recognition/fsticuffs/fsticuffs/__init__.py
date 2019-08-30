@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any, Set, List, Tuple
 import pywrapfst as fst
 import networkx as nx
 
-from jsgf2fst import fstaccept, symbols2intent
+from training.jsgf2fst import fstaccept, symbols2intent
 
 # -------------------------------------------------------------------------------------------------
 
