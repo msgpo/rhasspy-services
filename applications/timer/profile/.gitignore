@@ -4,3 +4,4 @@ language_model.txt
 dictionary.txt
 vocab.txt
 intent.fst
+intent.fst.*
