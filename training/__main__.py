@@ -335,7 +335,7 @@ def task_vocab_g2p():
 
 def task_kaldi_train():
     """Creates HCLG.fst for a Kaldi nnet3 or gmm model."""
-    if kaldi_model_type:
+    if kaldi_model_type is not None:
         return {
             "file_dep": [dictionary, language_model],
             "targets": [kaldi_graph_dir / "HCLG.fst"],

@@ -3,20 +3,16 @@ import os
 import argparse
 import logging
 
+import pywrapfst as fst
+
 from . import fsts_to_flair
 
 
 def main():
     parser = argparse.ArgumentParser("flair_train")
     parser.add_argument(
-        "--fst",
-        action="append",
-        default=[],
-        help="Intent FST(s) to include in training data",
-    )
-    parser.add_argument(
-        "--fst-dir",
-        help="Directory containing all intent FSTs to include in training data",
+        "--intent-fst",
+        help="Path to finite state transducer with all intents",
     )
     parser.add_argument(
         "--embedding", required=True, action="append", help="Word embedding(s) to use"
@@ -49,17 +45,10 @@ def main():
 
     logging.debug(args)
 
-    fst_paths = [p for p in args.fst]
-    if args.fst_dir:
-        for f_name in os.listdir(args.fst_dir):
-            fst_path = os.path.join(args.fst_dir, f_name)
-            if os.path.isfile(fst_path):
-                fst_paths.append(fst_path)
-
-    logging.debug(fst_paths)
+    intent_fst = fst.Fst.read(args.intent_fst)
 
     fsts_to_flair(
-        fst_paths,
+        intent_fst,
         args.embedding,
         args.cache_dir,
         args.data_dir,

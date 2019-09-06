@@ -19,6 +19,7 @@ DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
 DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
 DEFINE_boolean 'skip-unknown' false 'Skip tokens not present in FST input symbol table'
 DEFINE_boolean 'fuzzy' false 'Use fuzzy search (slower)'
+DEFINE_string 'stop-words' '' 'File with words that can be ignored during fuzzy recognition'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -45,6 +46,8 @@ if [[ "${FLAGS_fuzzy}" -eq "${FLAGS_TRUE}" ]]; then
     fuzzy='true'
 fi
 
+stop_words="${FLAGS_stop_words}"
+
 # -----------------------------------------------------------------------------
 # Profile
 # -----------------------------------------------------------------------------
@@ -54,7 +57,8 @@ if [[ ! -z "${profile_dir}" ]]; then
     source <(rhasspy-yq "${profile_dir}/profile.yml" \
                         -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" \
                         -q skip_unknown 'intent-recognition.fsticuffs.skip-unknown' "${skip_unknown}" \
-                        -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" | \
+                        -q fuzzy 'intent-recognition.fsticuffs.fuzzy' "${fuzzy}" \
+                        -q stop_words 'intent-recognition.fsticuffs.stop-words-file' "${stop_words}" | \
                  tee /dev/stderr)
 fi
 
@@ -72,6 +76,10 @@ fi
 
 if [[ ! -z "${fuzzy}" ]]; then
     args+=('--fuzzy')
+fi
+
+if [[ ! -z "${stop_words}" ]]; then
+    args+=('--stop-words' "${stop_words}")
 fi
 
 args+=("$@")

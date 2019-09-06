@@ -54,7 +54,7 @@ logger = logging.getLogger("flair_rhasspy")
 
 
 def fsts_to_flair(
-    intent_fst_paths: List[str],
+    intent_fst: fst.Fst,
     embeddings: List[str],
     cache_dir: str,
     data_dir: str,
@@ -81,15 +81,15 @@ def fsts_to_flair(
 
     if samples is not None:
         # Generate samples
+        num_intents = sum(1 for a in intent_fst.arcs(intent_fst.start()))
         logger.debug(
-            f"Generating {samples} sample(s) from {len(intent_fst_paths)} intent(s)"
+            f"Generating {samples} sample(s) from {num_intents} intent(s)"
         )
 
-        sentences_by_intent = sample_sentences_by_intent(intent_fst_paths, samples)
+        sentences_by_intent = sample_sentences_by_intent(intent_fst, samples)
     else:
         # Exhaustively generate all sentences
         logger.debug("Generating all possible sentences (may take a long time)")
-        intent_fst = fst.Fst.read(intent_fst_paths[0])
         sentences_by_intent = make_sentences_by_intent(intent_fst)
 
     sentence_time = time.time() - start_time
@@ -220,14 +220,10 @@ def fsts_to_flair(
 
 
 def sample_sentences_by_intent(
-    intent_fst_paths: List[str], num_samples: int
+    intent_fst: fst.Fst, num_samples: int
 ) -> Dict[str, Any]:
-    def sample_sentences(intent_name: str, intent_fst_path: str):
-        rand_fst = fst.Fst.read_from_string(
-            subprocess.check_output(
-                ["fstrandgen", f"--npath={num_samples}", intent_fst_path]
-            )
-        )
+    def sample_sentences(intent_name: str, sample_fst: fst.Fst):
+        rand_fst = fst.randgen(sample_fst, npath=num_samples)
 
         sentences: List[Dict[str, Any]] = []
         for symbols in fstprintall(rand_fst, exclude_meta=False):
@@ -240,9 +236,16 @@ def sample_sentences_by_intent(
     # Generate samples in parallel
     future_to_intent = {}
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        for intent_fst_path in intent_fst_paths:
-            intent_name = os.path.splitext(os.path.split(intent_fst_path)[1])[0]
-            future = executor.submit(sample_sentences, intent_name, intent_fst_path)
+        for intent_arc in intent_fst.arcs(intent_fst.start()):
+            # Strip __label__ from front of output symbol
+            intent_name = intent_fst.output_symbols().find(intent_arc.olabel).decode()[9:]
+
+            # Create copy of FST, starting at this intent's state
+            sample_fst = intent_fst.copy()
+            sample_fst.set_start(intent_arc.nextstate)
+
+            # Generate sample sentences for this intent
+            future = executor.submit(sample_sentences, intent_name, sample_fst)
             future_to_intent[future] = intent_name
 
     # { intent: [ { 'text': ..., 'entities': { ... } }, ... ] }

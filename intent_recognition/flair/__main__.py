@@ -2,8 +2,10 @@
 import os
 import sys
 import argparse
+import json
 import logging
 import logging.config
+logger = logging.getLogger("flair_rhasspy")
 
 import jsonlines
 import pywrapfst as fst
@@ -38,6 +40,11 @@ def main():
         help="Force PyTorch to use CPU even if CUDA is available",
     )
     parser.add_argument(
+        "--text-input",
+        action="store_true",
+        help="Input is text instead of topic + JSON",
+    )
+    parser.add_argument(
         "--debug", action="store_true", help="Print DEBUG messages to console"
     )
     args, _ = parser.parse_known_args()
@@ -45,14 +52,14 @@ def main():
     if args.debug:
         logging.root.setLevel(logging.DEBUG)
 
-    logging.debug(args)
+    logger.debug(args)
 
     if (
         (args.class_model is None)
         and (args.ner_model_dir is None)
         and (len(args.ner_model) == 0)
     ):
-        logging.fatal(
+        logger.fatal(
             "One of --class-model, --ner-model-dir, or --ner-model is required"
         )
         sys.exit(1)
@@ -79,7 +86,7 @@ def main():
                 }
             },
             "loggers": {
-                "rhasspy": {"handlers": ["rhasspy.handler"], "propagate": False},
+                "flair_rhasspy": {"handlers": ["rhasspy.handler"], "propagate": False},
                 "flair": {
                     "handlers": ["rhasspy.handler"],
                     "level": "INFO",
@@ -95,10 +102,10 @@ def main():
 
     # Load intent FST
     if args.intent_fst is not None:
-        logging.debug(f"Loading intent FST from {args.intent_fst}")
+        logger.debug(f"Loading intent FST from {args.intent_fst}")
         intent_fst = fst.Fst.read(args.intent_fst)
         intent_to_slots = make_slot_fsts(intent_fst)
-        logging.debug(
+        logger.debug(
             "Intent slots: {}".format(
                 {
                     name: list(slot_fsts.keys())
@@ -115,10 +122,10 @@ def main():
             if os.path.isdir(dir_path):
                 ner_model_paths.append(os.path.join(dir_path, "final-model.pt"))
 
-    logging.debug(ner_model_paths)
+    logger.debug(ner_model_paths)
 
     if args.no_cuda:
-        logging.info("Using CPU instead of GPU")
+        logger.info("Using CPU instead of GPU")
         flair.device = torch.device("cpu")
 
     # Load flair models
@@ -131,14 +138,13 @@ def main():
             if len(line) == 0:
                 continue
 
-            logging.debug(line)
+            logger.debug(line)
 
-            try:
-                # Try to interpret as JSON
+            if args.text_input:
+                pass
+            else:
                 request = json.loads(line)
                 line = request["text"]
-            except:
-                pass  # assume line is just text
 
             if args.lower:
                 line = line.lower()

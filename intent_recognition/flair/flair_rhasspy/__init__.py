@@ -60,7 +60,7 @@ def recognize(
             if slot_fst is not None:
                 try:
                     # Transform with FST
-                    logging.debug(
+                    logger.debug(
                         f'Transforming "{slot_value}" for slot "{slot_name}" with FST'
                     )
                     slot_value = fstaccept(slot_fst, slot_value)[0]["text"]

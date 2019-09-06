@@ -31,6 +31,10 @@ logger = logging.getLogger("jsgf2fst")
 
 # -----------------------------------------------------------------------------
 
+JSGF_RESERVED = re.compile(r"[;=,*+()<>{}\[]]")
+
+# -----------------------------------------------------------------------------
+
 
 def get_parser(grammar: str) -> JsgfParser:
     """Returns an ANTLR JSGF parser for a JSGF grammar."""
@@ -78,8 +82,6 @@ def grammar_to_fsts(
         symbol = output_symbols.find(i).decode()
         if symbol.startswith("__replace__"):
             replace_indices[i] = symbol[11:]
-
-    logger.debug(f"Found {len(replace_indices)} __replace__ symbols")
 
     # Handle __replace__
     graph = listener.graph
@@ -147,17 +149,55 @@ def slots_to_fsts(
         if (slot_names is not None) and (slot_name not in slot_names):
             continue
 
-        # Convert to JSGF grammar
-        with io.StringIO() as grammar_file:
-            with open(slot_path, "r") as slot_file:
-                choices = "|".join(f"({line.strip()})" for line in slot_file)
-                print("#JSGF v1.0;", file=grammar_file)
-                print(f"grammar {slot_name};", file=grammar_file)
-                print(f"public <{slot_name}> = ({choices});", file=grammar_file)
+        slot_fst = fst.Fst()
+        weight_one = fst.Weight.One(slot_fst.weight_type())
+        slot_start = slot_fst.add_state()
+        slot_fst.set_start(slot_start)
 
-            slot_grammar = grammar_file.getvalue()
+        slot_end = slot_fst.add_state()
+        slot_fst.set_final(slot_end)
 
-        slot_fsts["$" + slot_name] = grammar_to_fsts(slot_grammar, eps=eps).grammar_fst
+        input_symbols = fst.SymbolTable()
+        in_eps = input_symbols.add_symbol(eps)
+
+        output_symbols = fst.SymbolTable()
+        out_eps = output_symbols.add_symbol(eps)
+
+        replacements: Dict[str, fst.Fst] = {}
+
+        with open(slot_path, "r") as slot_file:
+            # Process each line independently to avoid recursion limit
+            for line in slot_file:
+                line = line.strip()
+                if len(line) == 0:
+                    continue
+
+                replace_symbol = f"__replace__{len(replacements)}"
+                out_replace = output_symbols.add_symbol(replace_symbol)
+
+                # Convert to JSGF grammar
+                with io.StringIO() as grammar_file:
+                    print("#JSGF v1.0;", file=grammar_file)
+                    print(f"grammar {slot_name};", file=grammar_file)
+                    print(f"public <{slot_name}> = ({line});", file=grammar_file)
+
+                    line_grammar = grammar_file.getvalue()
+                    line_fst = grammar_to_fsts(line_grammar).grammar_fst
+
+                    slot_fst.add_arc(
+                        slot_start, fst.Arc(in_eps, out_replace, weight_one, slot_end)
+                    )
+
+                    replacements[out_replace] = line_fst
+
+        # ---------------------------------------------------------------------
+
+        # Fix symbol tables
+        slot_fst.set_input_symbols(input_symbols)
+        slot_fst.set_output_symbols(output_symbols)
+
+        # Replace slot values
+        slot_fsts["$" + slot_name] = _replace_fsts(slot_fst, replacements)
 
     return slot_fsts
 
