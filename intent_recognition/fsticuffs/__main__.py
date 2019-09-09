@@ -142,7 +142,7 @@ def main():
     # Initial load
     reload_fst()
 
-    # Recognize lines from stdin
+    # Recognize lines from file
     for line in events_in_file:
         line = line.strip()
         if len(line) == 0:

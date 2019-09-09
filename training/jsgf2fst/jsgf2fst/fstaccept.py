@@ -5,11 +5,13 @@ import argparse
 import re
 import json
 import logging
-from typing import Dict, Any, List, Optional, TextIO, Mapping, Union
+from typing import Dict, Any, List, Optional, TextIO, Mapping, Union, Iterable
+from collections import deque
 
 import pywrapfst as fst
 
 logger = logging.getLogger("fstaccept")
+
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
@@ -200,55 +202,211 @@ def fstprintall(
     in_fst: fst.Fst,
     out_file: Optional[TextIO] = None,
     exclude_meta: bool = True,
-    state: Optional[int] = None,
-    path: Optional[List[fst.Arc]] = None,
-    zero_weight: Optional[fst.Weight] = None,
-    eps: int = 0,
+    out_eps: int = 0,
 ) -> List[List[str]]:
     sentences = []
-    path = path or []
-    state = state or in_fst.start()
-    zero_weight = zero_weight or fst.Weight.Zero(in_fst.weight_type())
+    output_symbols = in_fst.output_symbols()
+    zero_weight = fst.Weight.Zero(in_fst.weight_type())
+    visited_states = set()
 
-    for arc in in_fst.arcs(state):
-        path.append(arc)
+    state_queue = deque()
+    state_queue.append((in_fst.start(), []))
 
-        if in_fst.final(arc.nextstate) != zero_weight:
-            # Final state
-            out_syms = in_fst.output_symbols()
-            sentence = []
-            for p_arc in path:
-                if p_arc.olabel != eps:
-                    osym = out_syms.find(p_arc.olabel).decode()
-                    if exclude_meta and osym.startswith("__"):
-                        continue  # skip __label__, etc.
+    while len(state_queue) > 0:
+        state, sentence = state_queue.popleft()
+        if state in visited_states:
+            continue
 
-                    if out_file:
-                        print(osym, "", end="", file=out_file)
-                    else:
-                        sentence.append(osym)
+        visited_states.add(state)
 
+        if in_fst.final(state) != zero_weight:
             if out_file:
                 print("", file=out_file)
             else:
                 sentences.append(sentence)
-        else:
-            # Non-final state
-            sentences.extend(
-                fstprintall(
-                    in_fst,
-                    out_file=out_file,
-                    state=arc.nextstate,
-                    path=path,
-                    zero_weight=zero_weight,
-                    eps=eps,
-                    exclude_meta=exclude_meta,
-                )
-            )
 
-        path.pop()
+        for arc in in_fst.arcs(state):
+            if arc.olabel != out_eps:
+                out_symbol = output_symbols.find(arc.olabel).decode()
+                if exclude_meta and out_symbol.startswith("__"):
+                    pass  # skip __label__, etc.
+                else:
+                    sentence.append(out_symbol)
+
+            state_queue.append((arc.nextstate, list(sentence)))
 
     return sentences
+
+
+# -----------------------------------------------------------------------------
+
+
+def longest_path(the_fst: fst.Fst, eps: str = "<eps>") -> fst.Fst:
+    output_symbols = the_fst.output_symbols()
+    out_eps = output_symbols.find(eps)
+    visited_states: Set[int] = set()
+    best_path = []
+    state_queue = deque()
+    state_queue.append((the_fst.start(), []))
+
+    # Determine longest path
+    while len(state_queue) > 0:
+        state, path = state_queue.popleft()
+        if state in visited_states:
+            continue
+
+        visited_states.add(state)
+
+        if len(path) > len(best_path):
+            best_path = path
+
+        for arc in the_fst.arcs(state):
+            next_path = list(path)
+            next_path.append(arc.olabel)
+            state_queue.append((arc.nextstate, next_path))
+
+    # Create FST with longest path
+    path_fst = fst.Fst()
+
+    input_symbols = fst.SymbolTable()
+    input_symbols.add_symbol(eps)
+    path_fst.set_output_symbols(output_symbols)
+    weight_one = fst.Weight.One(path_fst.weight_type())
+
+    state = path_fst.add_state()
+    path_fst.set_start(state)
+
+    for olabel in best_path:
+        osym = output_symbols.find(olabel).decode()
+        next_state = path_fst.add_state()
+        path_fst.add_arc(
+            state,
+            fst.Arc(input_symbols.add_symbol(osym), olabel, weight_one, next_state),
+        )
+        state = next_state
+
+    path_fst.set_final(state)
+    path_fst.set_input_symbols(input_symbols)
+
+    return path_fst
+
+
+# -----------------------------------------------------------------------------
+
+
+def filter_words(words: Iterable[str], the_fst: fst.Fst) -> List[str]:
+    input_symbols = the_fst.input_symbols()
+    return [w for w in words if input_symbols.find(w) >= 0]
+
+
+# -----------------------------------------------------------------------------
+
+
+def make_slot_acceptor(intent_fst: fst.Fst, eps: str = "<eps>") -> fst.Fst:
+    in_eps = intent_fst.input_symbols().find(eps)
+    out_eps = intent_fst.output_symbols().find(eps)
+    slot_fst = fst.Fst()
+
+    # Copy symbol tables
+    all_symbols = fst.SymbolTable()
+    meta_keys = set()
+
+    for table in [intent_fst.input_symbols(), intent_fst.output_symbols()]:
+        for i in range(table.num_symbols()):
+            key = table.get_nth_key(i)
+            sym = table.find(key).decode()
+            all_key = all_symbols.add_symbol(sym)
+            if sym.startswith("__"):
+                meta_keys.add(all_key)
+
+    weight_one = fst.Weight.One(slot_fst.weight_type())
+    weight_zero = fst.Weight.Zero(slot_fst.weight_type())
+
+    # States that will be set to final
+    final_states: Set[int] = set()
+
+    # States that already have all-word loops
+    loop_states: Set[int] = set()
+
+    all_eps = all_symbols.find(eps)
+
+    # Add self transitions to a state for all input words (besides <eps>)
+    def add_loop_state(state):
+        for sym_idx in range(all_symbols.num_symbols()):
+            all_key = all_symbols.get_nth_key(sym_idx)
+            if (all_key != all_eps) and (all_key not in meta_keys):
+                slot_fst.add_arc(state, fst.Arc(all_key, all_key, weight_one, state))
+
+    slot_fst.set_start(slot_fst.add_state())
+
+    # Queue of (intent state, acceptor state, copy count)
+    state_queue = deque()
+    state_queue.append((intent_fst.start(), slot_fst.start(), 0))
+
+    # BFS
+    while len(state_queue) > 0:
+        intent_state, slot_state, do_copy = state_queue.popleft()
+        final_states.add(slot_state)
+        for intent_arc in intent_fst.arcs(intent_state):
+            out_symbol = intent_fst.output_symbols().find(intent_arc.olabel).decode()
+            all_key = all_symbols.find(out_symbol)
+
+            if out_symbol.startswith("__label__"):
+                # Create corresponding __label__ arc
+                next_state = slot_fst.add_state()
+                slot_fst.add_arc(
+                    slot_state, fst.Arc(all_key, all_key, weight_one, next_state)
+                )
+
+                # Must create a loop here for intents with no slots
+                add_loop_state(next_state)
+                loop_states.add(slot_state)
+            else:
+                # Non-label arc
+                if out_symbol.startswith("__begin__"):
+                    # States/arcs will be copied until __end__ is reached
+                    do_copy += 1
+
+                    # Add loop transitions to soak up non-tag words
+                    if not slot_state in loop_states:
+                        add_loop_state(slot_state)
+                        loop_states.add(slot_state)
+
+                if (do_copy > 0) and (
+                    (intent_arc.ilabel != in_eps) or (intent_arc.olabel != out_eps)
+                ):
+                    # Copy state/arc
+                    in_symbol = (
+                        intent_fst.input_symbols().find(intent_arc.ilabel).decode()
+                    )
+                    next_state = slot_fst.add_state()
+                    slot_fst.add_arc(
+                        slot_state,
+                        fst.Arc(
+                            all_symbols.find(in_symbol), all_key, weight_one, next_state
+                        ),
+                    )
+                    final_states.discard(slot_state)
+                else:
+                    next_state = slot_state
+
+                if out_symbol.startswith("__end__"):
+                    # Stop copying after this state until next __begin__
+                    do_copy -= 1
+
+            next_info = (intent_arc.nextstate, next_state, do_copy)
+            state_queue.append(next_info)
+
+    # Mark all dangling states as final (excluding start)
+    for state in final_states:
+        if state != slot_fst.start():
+            slot_fst.set_final(state)
+
+    # Fix symbol tables
+    slot_fst.set_input_symbols(all_symbols)
+    slot_fst.set_output_symbols(all_symbols)
+
+    return slot_fst
 
 
 # -----------------------------------------------------------------------------

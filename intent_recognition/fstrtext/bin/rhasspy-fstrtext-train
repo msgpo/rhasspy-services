@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+# Profile wrapper around rhasspy-fsticuffs
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+# fstrtext
+DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
+DEFINE_string 'slot-fst' '' 'Path to write slot acceptor'
+DEFINE_string 'model-path' '' 'Path to write fasttext model'
+DEFINE_string 'text-path' '' 'Path to write sampled sentences'
+DEFINE_integer 'samples' 0 'Number of samples to generate and train on'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+intent_fst="${FLAGS_intent_fst}"
+slot_fst="${FLAGS_slot_fst}"
+model_path="${FLAGS_model_path}"
+text_path="${FLAGS_text_path}"
+samples="${FLAGS_samples}"
+
+# -----------------------------------------------------------------------------
+# Required Settings
+# -----------------------------------------------------------------------------
+
+if [[ -z "${intent_fst}" ]]; then
+    echo '--intent-fst is required'
+    exit 1
+fi
+
+if [[ -z "${slot_fst}" ]]; then
+    echo '--slot-fst is required'
+    exit 1
+fi
+
+if [[ -z "${model_path}" ]]; then
+    echo '--model-path is required'
+    exit 1
+fi
+
+if [[ "${samples}" == 0 ]]; then
+    echo '--samples is required'
+    exit 1
+fi
+
+# -----------------------------------------------------------------------------
+
+if [[ -z "${text_path}" ]]; then
+    # Use temp file
+    text_path="$(mktemp)"
+    function cleanup {
+        rm -f "${text_path}"
+    }
+
+    trap cleanup EXIT
+fi
+
+# -----------------------------------------------------------------------------
+
+set -e
+
+# Create slot acceptor
+python3 -m intent_recognition.fstrtext.fstrtext_train \
+        --intent-fst "${intent_fst}" \
+        --slot-fst "${slot_fst}"
+
+echo "Wrote slot FST to ${slot_fst}"
+
+# Generate training samples
+echo "Generating ${samples} sample sentences"
+fstprint-all \
+    <(fstrandgen "--npath=${samples}" "${intent_fst}") | \
+    sed -e 's/__begin__[^ ]\+ //g' | \
+    sed -e 's/ __end__[^ ]\+//g' \
+        > "${text_path}"
+
+# Train classifier
+echo "Training fasttext model"
+fasttext \
+    supervised \
+    -input "${text_path}" \
+    -output "${model_path}"
+
+echo "Wrote fasttext model to ${model_path}"

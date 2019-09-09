@@ -6,4 +6,8 @@ from .jsgf2fst import (
     symbols2intent,
     fstaccept,
     fstprintall,
+    make_slot_acceptor,
+    filter_words,
+    apply_fst,
+    longest_path,
 )

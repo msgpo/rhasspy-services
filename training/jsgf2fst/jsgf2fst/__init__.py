@@ -25,7 +25,15 @@ from .JsgfParserListener import JsgfParserListener
 from .FSTListener import FSTListener
 from .DependencyListener import DependencyListener
 
-from .fstaccept import fstaccept, fstprintall, symbols2intent
+from .fstaccept import (
+    fstaccept,
+    fstprintall,
+    symbols2intent,
+    longest_path,
+    filter_words,
+    make_slot_acceptor,
+    apply_fst,
+)
 
 logger = logging.getLogger("jsgf2fst")
 
