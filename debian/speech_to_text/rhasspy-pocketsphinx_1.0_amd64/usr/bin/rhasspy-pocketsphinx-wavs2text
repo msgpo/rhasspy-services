@@ -11,9 +11,18 @@ trap cleanup EXIT
 
 touch "${audio}" "${events}"
 
+# -----------------------------------------------------------------------------
+
+event_prefix='rhasspy/speech-to-text'
+event_start="${event_prefix}/start-listening"
+event_stop="${event_prefix}/stop-listening"
+event_text_captured="${event_prefix}/text-captured"
+
+# -----------------------------------------------------------------------------
+
 while read -r wav_path;
 do
-    echo 'start {}' >> "${events}"
+    echo "${event_start} {}" >> "${events}"
 
     wav_name="$(basename "${wav_path}")"
     wav_duration="$(soxi -D "${wav_path}")"
@@ -25,13 +34,13 @@ do
 
     # Construct JSON object to pass through "stop" event
     stop_data="$(jq -n -c --arg wn "${wav_name}" --argjson ws "${wav_duration}" '{ wav_name:$wn, wav_seconds:$ws }')"
-    echo "stop ${stop_data}" >> "${events}"
+    echo "${event_stop} ${stop_data}" >> "${events}"
 done
 
-/usr/lib/rhasspy/pocketsphinx.pocketsphinx \
-        --audio-file "${audio}" \
-        --audio-file-lines \
-        --events-file "${events}" \
-        --event-start 'start' \
-        --event-stop 'stop' \
-        "$@"
+rhasspy-pocketsphinx \
+    --audio-file "${audio}" \
+    --audio-file-lines \
+    --events-in-file "${events}" \
+    "$@" | \
+    grep "^${event_text_captured} " | \
+    cut -d' ' -f2-

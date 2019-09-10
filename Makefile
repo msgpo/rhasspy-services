@@ -8,6 +8,7 @@
         debian-porcupine \
         debian-program-launcher \
         debian-train \
+        debian-repository \
         docker-assistant-en-us \
         docker-espeak \
         docker-fsticuffs \
@@ -20,6 +21,7 @@
         docker-push-to-talk \
         docker-webrtcvad \
         installer-fsticuffs \
+        installer-fstrtext \
         installer-kaldi \
         installer-pocketsphinx \
         installer-porcupine \
@@ -76,6 +78,10 @@ docker-webrtcvad:
 installer-fsticuffs:
 	bash build.sh installer/intent_recognition/fsticuffs.spec
 
+installer-fstrtext:
+	bash build.sh installer/intent_recognition/fstrtext.spec
+	bash build.sh installer/intent_recognition/fstrtext-train.spec
+
 installer-kaldi:
 	bash build.sh installer/speech_to_text/kaldi.spec
 
@@ -116,6 +122,12 @@ debian-espeak:
 debian-fsticuffs: installer-fsticuffs
 	bash debianize.sh intent_recognition fsticuffs $(FRIENDLY_ARCH)
 
+debian-fstrtext: installer-fstrtext
+	output_dir="debian/intent_recognition/rhasspy-fstrtext_1.0_$(FRIENDLY_ARCH)/usr/lib/rhasspy/fstrtext-train"; \
+    mkdir -p "$${output_dir}" && \
+    rsync -av --delete dist/fstrtext-train/ "$${output_dir}/"
+	bash debianize.sh intent_recognition fstrtext $(FRIENDLY_ARCH)
+
 debian-kaldi: installer-kaldi
 	bash debianize.sh speech_to_text kaldi $(FRIENDLY_ARCH)
 
@@ -153,9 +165,25 @@ debian-train: installer-train
 debian-utils: installer-utils
 	bash debianize.sh utils yq $(FRIENDLY_ARCH)
 	bash debianize.sh utils jsonl-sub $(FRIENDLY_ARCH)
+	cd debian/utils && fakeroot dpkg --build rhasspy-utils_1.0_all
 
 debian-webrtcvad: installer-webrtcvad
 	bash debianize.sh voice_command webrtcvad $(FRIENDLY_ARCH)
+
+
+# -----------------------------------------------------------------------------
+# Debian Repository
+# -----------------------------------------------------------------------------
+
+DEBIAN_REPO := "$(HOME)/opt/rhasspy-repo"
+
+debian-repository:
+	mkdir -p $(DEBIAN_REPO)
+	find ./debian -name '*.deb' -print0 | \
+        xargs --null --replace={} -- \
+            cp '{}' $(DEBIAN_REPO)/
+	cd $(DEBIAN_REPO) && \
+        dpkg-scanpackages . | gzip -9c > Packages.gz
 
 # -----------------------------------------------------------------------------
 # Multi-Arch Builds

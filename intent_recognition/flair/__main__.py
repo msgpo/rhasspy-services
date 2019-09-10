@@ -135,9 +135,6 @@ def main():
     try:
         for line in sys.stdin:
             line = line.strip()
-            if len(line) == 0:
-                continue
-
             logger.debug(line)
 
             if args.text_input:

@@ -12,6 +12,5 @@ args+=("$@")
 
 install_dir='/usr/lib/rhasspy'
 export PATH="${install_dir}/kaldi:${install_dir}/bin/kaldi:${PATH}"
-export shflags="${install_dir}/etc/kaldi/shflags"
 
 "${install_dir}/kaldi/kaldi" "${args[@]}"

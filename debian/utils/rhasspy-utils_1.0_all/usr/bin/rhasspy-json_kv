@@ -1,0 +1,24 @@
+#!/usr/bin/env python3
+import sys
+import json
+import argparse
+
+
+def main():
+    parser = argparse.ArgumentParser("json_kv")
+    parser.add_argument(
+        "--delimiter", "-d", default=" ", help="Delimiter between keys and values"
+    )
+    args = parser.parse_args()
+
+    obj = {}
+    for line in sys.stdin:
+        key, value = line.split(args.delimiter, maxsplit=1)
+        obj[key] = json.loads(value)
+
+    json.dump(obj, sys.stdout, indent=4)
+
+# -----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,8 @@
+Package: rhasspy-utils
+Version: 1.0
+Section: utils
+Priority: optional
+Architecture: all
+Maintainer: Michael Hansen
+Depends: python3, perl
+Description: Miscellaneous utilities for Rhasspy voice framework

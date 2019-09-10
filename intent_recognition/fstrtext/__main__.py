@@ -108,10 +108,6 @@ def main():
     # Recognize lines from file
     for line in events_in_file:
         line = line.strip()
-
-        if len(line) == 0:
-            continue
-
         logger.debug(line)
 
         try:

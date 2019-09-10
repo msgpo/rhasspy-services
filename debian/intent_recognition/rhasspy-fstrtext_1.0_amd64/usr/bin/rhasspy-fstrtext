@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+
+# Profile wrapper around rhasspy-fsticuffs
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+# fstrtext
+DEFINE_boolean 'debug' false 'Print DEBUG messages to console'
+DEFINE_string 'slot-fst' '' 'Path to slot acceptor FST'
+DEFINE_string 'model-path' '' 'Path to fasttext binary model'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+slot_fst="${FLAGS_slot_fst}"
+model_path="${FLAGS_model_path}"
+
+# -----------------------------------------------------------------------------
+# Required Settings
+# -----------------------------------------------------------------------------
+
+if [[ -z "${slot_fst}" ]]; then
+    echo '--slot-fst is required'
+    exit 1
+fi
+
+if [[ -z "${model_path}" ]]; then
+    echo '--model-path is required'
+    exit 1
+fi
+
+if [[ "${FLAGS_debug}" -eq "${FLAGS_TRUE}" ]]; then
+    debug='--debug'
+fi
+
+# -----------------------------------------------------------------------------
+
+temp_dir="$(mktemp -d)"
+function cleanup {
+    rm -rf "${temp_dir}"
+}
+
+trap cleanup SIGINT SIGTERM
+
+# Create FIFOs
+classifier_sentences="${temp_dir}/sentences"
+classifier_labels="${temp_dir}/labels"
+
+mkfifo "${classifier_sentences}" \
+       "${classifier_labels}"
+
+# -----------------------------------------------------------------------------
+
+set -e
+
+install_dir="${rhasspy_dir}/fstrtext"
+export LD_LIBRARY_PATH="${install_dir}:${LD_LIBRARY_PATH}"
+
+# Start classifier.
+# Will terminate when FIFO is closed by fstrtext.
+"${install_dir}/fasttext" \
+    predict \
+    "${model_path}" \
+    - \
+    < "${classifier_sentences}" \
+    > "${classifier_labels}" &
+
+# Run fstrtext
+args=("${debug}")
+args+=("$@")
+
+"${install_dir}/fstrtext" \
+    --slot-fst "${slot_fst}" \
+    --classifier-sentences "${classifier_sentences}" \
+    --classifier-labels "${classifier_labels}" \
+    "${args[@]}"

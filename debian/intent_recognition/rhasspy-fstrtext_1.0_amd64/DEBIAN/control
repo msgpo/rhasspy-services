@@ -1,0 +1,8 @@
+Package: rhasspy-fstrtext
+Version: 1.0
+Section: utils
+Priority: optional
+Depends: libc6, libstdc++6, mosquitto-clients, rhasspy-jsonl-sub (=1.0), rhasspy-yq (=1.0)
+Architecture: amd64
+Maintainer: Michael Hansen
+Description: Fasttext/OpenFST-based intent recognition tool for Rhasspy voice assistant

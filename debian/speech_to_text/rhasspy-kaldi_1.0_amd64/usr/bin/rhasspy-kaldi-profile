@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+# Profile wrapper around rhasspy-kaldi
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# kaldi
+DEFINE_string 'kaldi-dir' "${kaldi_dir}" 'Path to kaldi top-level directory'
+DEFINE_string 'model-type' '' 'Type of kaldi model (gmm or nnet3)'
+DEFINE_string 'model-dir' '' 'Directory with kaldi model'
+DEFINE_string 'graph-dir' '' 'Directory with kaldi HCLG.fst (defaults to graph)'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+kaldi_dir="${FLAGS_kaldi_dir}"
+model_type="${FLAGS_model_type}"
+model_dir="${FLAGS_model_dir}"
+graph_dir="${FLAGS_graph_dir}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q kaldi_dir 'speech-to-text.kaldi.kaldi-directory' "${kaldi_dir}" \
+                        -q model_dir 'speech-to-text.kaldi.model-directory' "${model_dir}" \
+                        -q model_type 'speech-to-text.kaldi.model-type' "${model_type}" \
+                        -q graph_dir 'speech-to-text.kaldi.graph-directory' "${graph_dir}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+# Validate
+# -----------------------------------------------------------------------------
+
+if [[ ! -d "${kaldi_dir}" ]]; then
+    echo "Kaldi does not exist at ${kaldi_dir}"
+    exit 1
+fi
+
+if [[ -z "${model_type}" ]]; then
+    echo "Model type is required"
+    exit 1
+fi
+
+if [[ -z "${model_dir}" ]]; then
+    echo "Model directory is required"
+    exit 1
+fi
+
+if [[ ! -d "${model_dir}" ]]; then
+    echo "Model directory does not exist at ${model_dir}"
+    exit 1
+fi
+
+if [[ -z "${graph_dir}" ]]; then
+    graph_dir="${model_dir}/graph"
+fi
+
+# -----------------------------------------------------------------------------
+
+args=()
+
+if [[ ! -z "${kaldi_dir}" ]]; then
+    args+=('--kaldi-dir' "${kaldi_dir}")
+fi
+
+if [[ ! -z "${model_dir}" ]]; then
+    args+=('--model-dir' "${model_dir}")
+fi
+
+if [[ ! -z "${model_type}" ]]; then
+    args+=('--model-type' "${model_type}")
+fi
+
+if [[ ! -z "${graph_dir}" ]]; then
+    args+=('--graph-dir' "${graph_dir}")
+fi
+
+args+=("$@")
+
+# -----------------------------------------------------------------------------
+
+rhasspy-kaldi "${args[@]}"
