@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Stream 16-bit 16Khz mono to stdout
+gst-launch-1.0 \
+    -q \
+    autoaudiosrc ! \
+    audioconvert ! \
+    audioresample ! \
+    audio/x-raw, rate=16000, channels=1, format=S16LE ! \
+    filesink location=/dev/stdout
