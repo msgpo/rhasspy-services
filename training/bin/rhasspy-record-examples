@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# sample
+DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
+DEFINE_string 'directory' '' 'Directory to save recorded WAV files' 'd'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+intent_fst="${FLAGS_intent_fst}"
+directory="${FLAGS_directory}"
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+# Required Settings
+# -----------------------------------------------------------------------------
+
+if [[ -z "${intent_fst}" ]]; then
+    echo '--intent-fst is required'
+    exit 1
+fi
+
+if [[ -z "${directory}" ]]; then
+    echo '--directory is required'
+    exit 1
+fi
+
+# -----------------------------------------------------------------------------
+
+function get_wav_path {
+    sentence="$1"
+    wav_name="$(echo -n "${sentence}" | sed -e 's/$\s\+//' | sed -e 's/\s\+$//' | sed -e 's/\s\+/_/g')"
+    i="$2"
+    if [[ -z "${i}" ]]; then
+        i=0
+    fi
+
+    printf -- '%s/%s-%03d.wav' "${directory}" "${wav_name}" "$(( i ))"
+}
+
+# -----------------------------------------------------------------------------
+
+set -e
+
+mkdir -p "${directory}"
+
+echo 'Follow the instructions below.'
+
+while true;
+do
+    sentence="$(rhasspy-sample-sentences --intent-fst "${intent_fst}" --samples 1)"
+
+    # Generate unique file name
+    i=0
+    wav_path="$(get_wav_path "${sentence}" "${i}")"
+    while [[ -e "${wav_path}" ]];
+    do
+        i="$(( i++ ))"
+        wav_path="$(get_wav_path "${sentence}" "${i}")"
+    done
+
+    # Record WAV file
+    echo "${sentence}"
+    echo -n 'Press ENTER to start recording. Press CTRL+C to exit.'
+    read
+    echo -n 'RECORDING. Press ENTER to stop.'
+    gst-launch-1.0 \
+        -q \
+        autoaudiosrc ! \
+        wavenc ! \
+        filesink "location=${wav_path}" &
+    pid=$!
+    read
+    kill -2 "${pid}"
+
+    # Write transcript
+    transcript_path="${wav_path%.wav}.txt"
+    echo -n "${sentence}" > "${transcript_path}"
+
+    # Write intent
+    intent_path="${wav_path%.wav}.json"
+    echo "${sentence}" | \
+        rhasspy-fsticuffs \
+            --intent-fst "${intent_fst}" \
+            --text-input \
+            > "${intent_path}"
+
+    echo ''
+done
