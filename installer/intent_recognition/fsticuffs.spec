@@ -22,7 +22,7 @@ a = Analysis(
         (os.path.join(venv, "lib/libfst.so.13"), "."),
     ],
     datas=[],
-    hiddenimports=["fsticuffs", "numbers"],
+    hiddenimports=["fsticuffs", "numbers", "antlr4-python3-runtime", "networkx"],
     hookspath=[],
     runtime_hooks=[],
     excludes=["pywrapfst"],

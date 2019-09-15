@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+if [[ -z "${rhasspy_dir}" ]]; then
+    export rhasspy_dir='/usr/lib/rhasspy'
+fi
+
+# -----------------------------------------------------------------------------
+# Command-line Arguments
+# -----------------------------------------------------------------------------
+
+. "${rhasspy_dir}/etc/shflags"
+
+DEFINE_string 'profile' '' 'Path to profile directory' 'p'
+
+# sample
+DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
+DEFINE_integer 'samples' 0 'Number of samples to generate and train on' 's'
+DEFINE_boolean 'meta' false 'Include meta labels in the sentences' 'm'
+
+FLAGS "$@" || exit $?
+eval set -- "${FLAGS_ARGV}"
+
+# -----------------------------------------------------------------------------
+# Default Settings
+# -----------------------------------------------------------------------------
+
+set -e
+
+profile_dir="${FLAGS_profile}"
+
+intent_fst="${FLAGS_intent_fst}"
+samples="${FLAGS_samples}"
+
+if [[ "${FLAGS_meta}" -eq "${FLAGS_TRUE}" ]]; then
+    meta='true'
+fi
+
+# -----------------------------------------------------------------------------
+# Profile
+# -----------------------------------------------------------------------------
+
+if [[ ! -z "${profile_dir}" ]]; then
+    export profile_dir="$(realpath "${profile_dir}")"
+    source <(rhasspy-yq "${profile_dir}/profile.yml" \
+                        -q intent_fst 'intent-recognition.fsticuffs.intent-fst' "${intent_fst}" | \
+                 tee /dev/stderr)
+fi
+
+# -----------------------------------------------------------------------------
+# Required Settings
+# -----------------------------------------------------------------------------
+
+if [[ -z "${intent_fst}" ]]; then
+    echo '--intent-fst is required'
+    exit 1
+fi
+
+# -----------------------------------------------------------------------------
+
+set -e
+
+# Generate training samples
+if [[ "${samples}" == 0 ]]; then
+    function generate {
+        fstprint-all "${intent_fst}"
+    }
+else
+    function generate {
+        fstprint-all \
+            <(fstrandgen "--npath=${samples}" "${intent_fst}")
+    }
+fi
+
+if [[ -z "${meta}" ]]; then
+    # Strip __meta__ tags
+    generate | \
+        sed -e 's/\b__[^_]\+__[^ ]\+\s*//g'
+else
+    generate
+fi

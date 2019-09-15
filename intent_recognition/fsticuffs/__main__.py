@@ -86,7 +86,7 @@ def main():
     # -------------------------------------------------------------------------
 
     # File to read events from
-    events_in_file = sys.stdin
+    events_in_file = None
     if args.events_in_file and (args.events_in_file != "-"):
         events_in_file = open(args.events_in_file, "r")
 
@@ -96,7 +96,9 @@ def main():
         events_out_file = open(args.events_out_file, "w")
 
     def send_event(topic, payload_dict={}):
-        print(topic, end=" ", file=events_out_file)
+        if topic is not None:
+            print(topic, end=" ", file=events_out_file)
+
         with jsonlines.Writer(events_out_file) as out:
             out.write(payload_dict)
 
@@ -142,62 +144,87 @@ def main():
     # Initial load
     reload_fst()
 
-    # Recognize lines from file
-    for line in events_in_file:
-        line = line.strip()
-        if len(line) == 0:
-            continue
+    if events_in_file:
+        # Recognize lines from file
+        for line in events_in_file:
+            line = line.strip()
+            if len(line) == 0:
+                continue
 
-        logger.debug(line)
+            logger.debug(line)
 
-        try:
-            if args.text_input:
-                # Assume text input
-                topic = EVENT_RECOGNIZE
-                event = json.dumps({"text": line})
-            else:
-                # Expected <topic> <payload> on each line
-                topic, event = line.split(" ", maxsplit=1)
-
-            topic_parts = topic.split("/")
-            base_topic = "/".join(topic_parts[:3])
-
-            # Everything after base topic is request id
-            request_id = "/".join(topic_parts[3:])
-            if len(request_id) > 0:
-                request_id = "/" + request_id
-
-            if base_topic == EVENT_RECOGNIZE:
-                event_dict = maybe_object(event)
-                text = event_dict.get("text", "")
-
-                if args.lower:
-                    text = text.lower()
-
-                if args.fuzzy:
-                    # Fuzzy search
-                    intent = recognize_fuzzy(
-                        intent_graph,
-                        text,
-                        known_tokens=known_tokens,
-                        stop_words=stop_words,
-                    )
+            try:
+                if args.text_input:
+                    # Assume text input
+                    topic = EVENT_RECOGNIZE
+                    event = json.dumps({"text": line})
                 else:
-                    # Fast (strict) search
-                    intent = recognize(intent_fst, text, known_tokens)
+                    # Expected <topic> <payload> on each line
+                    topic, event = line.split(" ", maxsplit=1)
 
-                send_event(EVENT_RECOGNIZED + request_id, intent)
-            elif base_topic == EVENT_RELOAD:
-                logging.debug("Reloading intent FST")
+                topic_parts = topic.split("/")
+                base_topic = "/".join(topic_parts[:3])
 
-                event_dict = maybe_object(event)
-                args.intent_fst = event_dict.get("intent-fst", args.intent_fst)
-                reload_fst()
+                # Everything after base topic is request id
+                request_id = "/".join(topic_parts[3:])
+                if len(request_id) > 0:
+                    request_id = "/" + request_id
 
-                send_event(EVENT_RELOADED + request_id, event_dict)
-        except Exception as e:
-            logger.exception(line)
-            send_event(EVENT_ERROR, {"error": str(e)})
+                if base_topic == EVENT_RECOGNIZE:
+                    event_dict = maybe_object(event)
+                    text = event_dict.get("text", "")
+
+                    if args.lower:
+                        text = text.lower()
+
+                    if args.fuzzy:
+                        # Fuzzy search
+                        intent = recognize_fuzzy(
+                            intent_graph,
+                            text,
+                            known_tokens=known_tokens,
+                            stop_words=stop_words,
+                        )
+                    else:
+                        # Fast (strict) search
+                        intent = recognize(intent_fst, text, known_tokens)
+
+                    send_event(EVENT_RECOGNIZED + request_id, intent)
+                elif base_topic == EVENT_RELOAD:
+                    logging.debug("Reloading intent FST")
+
+                    event_dict = maybe_object(event)
+                    args.intent_fst = event_dict.get("intent-fst", args.intent_fst)
+                    reload_fst()
+
+                    send_event(EVENT_RELOADED + request_id, event_dict)
+            except Exception as e:
+                logger.exception(line)
+                send_event(EVENT_ERROR, {"error": str(e)})
+    else:
+        # Read JSON or text line-by-line
+        for line in sys.stdin:
+            if args.text_input:
+                text = line
+            else:
+                text = maybe_object(line).get("text", "")
+
+            if args.lower:
+                text = text.lower()
+
+            if args.fuzzy:
+                # Fuzzy search
+                intent = recognize_fuzzy(
+                    intent_graph,
+                    text,
+                    known_tokens=known_tokens,
+                    stop_words=stop_words,
+                )
+            else:
+                # Fast (strict) search
+                intent = recognize(intent_fst, text, known_tokens)
+
+            send_event(None, intent)
 
 
 # -------------------------------------------------------------------------------------------------
