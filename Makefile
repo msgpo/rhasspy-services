@@ -7,6 +7,7 @@
         debian-pocketsphinx \
         debian-porcupine \
         debian-program-launcher \
+        debian-repository \
         debian-train \
         debian-repository \
         docker-assistant-en-us \
@@ -157,6 +158,11 @@ debian-push-to-talk:
     rsync -av --delete --exclude=bin user_interface/push-to-talk/ "$${output_dir}/" && \
     cp user_interface/push-to-talk/bin/rhasspy-* "$${bin_dir}/"
 	cd debian/user_interface && fakeroot dpkg --build rhasspy-push-to-talk_1.0_all
+
+debian-repository:
+	mkdir -p '../rhasspy-repo'
+	find debian/ -name '*.deb' -exec cp {} ../rhasspy-repo/ \;
+	cd ../rhasspy-repo && dpkg-scanpackages . | gzip > Packages.gz
 
 debian-train: installer-train
 	rsync -av dist/ini_jsgf/ dist/vocab_g2p/ dist/vocab_dict/ dist/jsgf2fst/ dist/train/

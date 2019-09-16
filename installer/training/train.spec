@@ -3,12 +3,18 @@ import os
 
 block_cipher = None
 
+venv = os.path.join(os.getcwd(), ".venv")
+
 a = Analysis(
     [os.path.join(os.getcwd(), "training/__main__.py")],
     pathex=["."],
-    binaries=[],
+    binaries=[
+        (os.path.join(venv, "bin", "fstrandgen"), "."),
+        (os.path.join(venv, "lib/libfstscript.so.13"), "."),
+        (os.path.join(venv, "lib/libfst.so.13"), "."),
+    ],
     datas=[],
-    hiddenimports=["doit", "dbm.gnu"],
+    hiddenimports=["doit", "dbm.gnu", "antlr4-python3-runtime", "networkx"],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
