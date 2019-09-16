@@ -55,52 +55,51 @@ fi
 
 set -e
 
+echo 'Creating slot acceptor'
+
 # Create slot acceptor
 python3 -m intent_recognition.fstrtext.fstrtext_train \
         --intent-fst "${intent_fst}" \
         --slot-fst "${slot_fst}"
 
+echo "Wrote slot FST to ${slot_fst}"
+
 if [[ "${samples}" == '-1' ]]; then
     # Expecting sentences as input
-    if [[ -z "${sentences}_path"]];
+    if [[ -z "${sentences_path}" ]];
     then
        sentences_path='/dev/stdin'
     fi
-
-    function generate {
-        cat "${sentences_path}"
-    }
 else
     # Sampling sentences
+    if [[ -z "${sentences_path}" ]]; then
+        # Use temp file
+        sentences_path="$(mktemp)"
+        function cleanup {
+            rm -f "${text_path}"
+        }
 
-if [[ -z "${sentences_path}" ]]; then
-    # Use temp file
-    text_path="$(mktemp)"
-    function cleanup {
-        rm -f "${text_path}"
-    }
+        trap cleanup EXIT
+    fi
 
-    trap cleanup EXIT
+    rhasspy-sample-sentences \
+        --intent-fst "${intent_fst}" \
+        --samples "${samples}" \
+        --meta | \
+        sed -e 's/__begin__[^ ]\+ //g' | \
+        sed -e 's/ __end__[^ ]\+//g' \
+            > "${sentences_path}"
+
+    echo "Wrote sample sentences to ${sentences_path}"
 fi
 
 # -----------------------------------------------------------------------------
 
-
-echo "Wrote slot FST to ${slot_fst}"
-
-# Generate training samples
-echo "Generating ${samples} sample sentences"
-fstprint-all \
-    <(fstrandgen "--npath=${samples}" "${intent_fst}") | \
-    sed -e 's/__begin__[^ ]\+ //g' | \
-    sed -e 's/ __end__[^ ]\+//g' \
-        > "${text_path}"
-
 # Train classifier
-echo "Training fasttext model"
+echo "Training fasttext model from sentences in ${sentences_path}"
 fasttext \
     supervised \
-    -input "${text_path}" \
+    -input "${sentences_path}" \
     -output "${model_path}"
 
 echo "Wrote fasttext model to ${model_path}"

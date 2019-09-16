@@ -11,7 +11,6 @@ import pywrapfst as fst
 import jsonlines
 
 from training.jsgf2fst import (
-    make_slot_acceptor,
     filter_words,
     apply_fst,
     longest_path,

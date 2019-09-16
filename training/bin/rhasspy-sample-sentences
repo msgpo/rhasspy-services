@@ -16,7 +16,7 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
 DEFINE_integer 'samples' 0 'Number of samples to generate and train on' 's'
 DEFINE_boolean 'meta' false 'Include meta labels in the sentences' 'm'
-DEFINE_boolean 'substitute' true 'Do text/tag substitutions'
+DEFINE_boolean 'substitute' false 'Do text/tag substitutions'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -91,11 +91,17 @@ fi
 # Text/tag substitutions
 if [[ -z "${substitute}" ]]; then
     function substitute {
-        cat
+        # Use WORD from WORD:SUB
+        sed -e 's/\([^ ]\+\):[^ ]\+/\1/g' | \
+            sed -e 's/:[^ ]*//g' | \
+            sed -e 's/\s\+/ /g'
     }
 else
     function substitute {
-        sed -e 's/\b[^: ]\+://g'
+        # Use SUB from WORD:SUB
+        sed -e 's/\b[^: ]\+://g' | \
+            sed -e 's/://g' | \
+            sed -e 's/\s\+/ /g'
     }
 fi
 

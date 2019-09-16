@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+import re
+import sys
+import argparse
+import json
+import subprocess
+from typing import Dict, Set, Any
+import logging
+
+logger = logging.getLogger("rhasspy-replace-slots")
+
+import pywrapfst as fst
+import jsonlines
+
+from training.jsgf2fst import filter_words, fstaccept
+
+
+def main():
+    parser = argparse.ArgumentParser("rhasspy-replace-slots")
+    parser.add_argument(
+        "--intent-fst", required=True, help="Path to intent finite state transducer"
+    )
+    parser.add_argument(
+        "--stop-words", help="Words to ignore when matching slot values"
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="Print DEBUG messages to console"
+    )
+    args, _ = parser.parse_known_args()
+
+    if args.debug:
+        logging.root.setLevel(logging.DEBUG)
+
+    logger.debug(args)
+
+    logger.debug(f"Loading intent FST from {args.intent_fst}")
+    intent_fst = fst.Fst.read(args.intent_fst)
+    intent_to_slots = make_slot_fsts(intent_fst)
+
+    if args.stop_words:
+        stop_words = set([line.strip() for line in open(args.stop_words, "r")])
+    else:
+        stop_words = set()
+
+    # -------------------------------------------------------------------------
+
+    for line in sys.stdin:
+        line = line.strip()
+        if len(line) == 0:
+            continue
+
+        intent = json.loads(line)
+        entities = intent.get("entities", [])
+        slots = intent.get("slots", {})
+        intent_name = intent.get("intent", {}).get("name", "")
+
+        slot_fsts = intent_to_slots.get(intent_name)
+        if slot_fsts is None:
+            continue
+
+        # Predict entities
+        for entity in entities:
+            slot_name = entity["entity"]
+            slot_fst = slot_fsts.get(slot_name)
+
+            if slot_fst is None:
+                continue
+
+            slot_value = entity["value"]
+            words = filter_words(re.split(r"\s+", slot_value), intent_fst)
+
+            try:
+                # Run sentence through slot FST
+                slot_value = fstaccept(slot_fst, words)[0]["text"]
+
+                entity["value"] = slot_value
+                slots[slot_name] = slot_value
+            except:
+                # Try again without stop words
+                try:
+                    words = [w for w in words if w not in stop_words]
+                    slot_value = fstaccept(slot_fst, words)[0]["text"]
+
+                    entity["value"] = slot_value
+                    slots[slot_name] = slot_value
+                except:
+                    # Use original value
+                    pass
+
+        with jsonlines.Writer(sys.stdout) as out:
+            out.write(intent)
+
+
+# -----------------------------------------------------------------------------
+
+
+def make_slot_fsts(intent_fst: fst.Fst) -> Dict[str, Dict[str, fst.Fst]]:
+    out_symbols = intent_fst.output_symbols()
+    intent_to_slots: Dict[str, Dict[str, fst.Fst]] = {}
+
+    start_state = intent_fst.start()
+    for intent_arc in intent_fst.arcs(start_state):
+        # Extract intent name from output label
+        intent_label = out_symbols.find(intent_arc.olabel).decode()
+        assert intent_label.startswith("__label__"), intent_label
+        intent_name = intent_label[9:]
+
+        # Create mapping from slot (tag) name to acceptor FST
+        slot_to_fst: Dict[str, fst.Fst] = {}
+        intent_to_slots[intent_name] = slot_to_fst
+
+        _make_slot_fst(intent_arc.nextstate, intent_fst, slot_to_fst)
+
+    return intent_to_slots
+
+
+def _make_slot_fst(
+    state: int, intent_fst: fst.Fst, slot_to_fst: Dict[str, fst.Fst], eps="<eps>"
+):
+    in_symbols = intent_fst.input_symbols()
+    out_symbols = intent_fst.output_symbols()
+    out_eps = out_symbols.find(eps)
+    one_weight = fst.Weight.One(intent_fst.weight_type())
+
+    for arc in intent_fst.arcs(state):
+        label = out_symbols.find(arc.olabel).decode()
+        if label.startswith("__begin__"):
+            slot_name = label[9:]
+
+            # Big assumption here that each instance of a slot (e.g., location)
+            # will produce the same FST, and therefore doesn't need to be
+            # processed again.
+            if slot_name in slot_to_fst:
+                continue  # skip duplicate slots
+
+            end_label = f"__end__{slot_name}"
+
+            # Create new FST
+            slot_fst = fst.Fst()
+            slot_fst.set_input_symbols(intent_fst.input_symbols())
+            slot_fst.set_output_symbols(intent_fst.output_symbols())
+
+            start_state = slot_fst.add_state()
+            slot_fst.set_start(start_state)
+            q = [arc.nextstate]
+            state_map = {arc.nextstate: start_state}
+
+            # Copy states/arcs from intent FST until __end__ is found
+            while len(q) > 0:
+                q_state = q.pop()
+                for q_arc in intent_fst.arcs(q_state):
+                    slot_arc_label = out_symbols.find(q_arc.olabel).decode()
+                    if slot_arc_label != end_label:
+                        if not q_arc.nextstate in state_map:
+                            state_map[q_arc.nextstate] = slot_fst.add_state()
+
+                        # Create word arc
+                        slot_fst.add_arc(
+                            state_map[q_state],
+                            fst.Arc(
+                                q_arc.ilabel,
+                                q_arc.olabel,
+                                one_weight,
+                                state_map[q_arc.nextstate],
+                            ),
+                        )
+
+                        # Continue copy
+                        q.append(q_arc.nextstate)
+                    else:
+                        # Mark previous state as final
+                        slot_fst.set_final(state_map[q_state])
+
+            slot_to_fst[slot_name] = minimize_fst(slot_fst)
+
+        # Recurse
+        _make_slot_fst(arc.nextstate, intent_fst, slot_to_fst)
+
+
+def minimize_fst(the_fst: fst.Fst) -> fst.Fst:
+    # BUG: Fst.minimize does not pass allow_nondet through, so we have to call out to the command-line
+    minimize_cmd = ["fstminimize", "--allow_nondet"]
+    return fst.Fst.read_from_string(
+        subprocess.check_output(minimize_cmd, input=the_fst.write_to_string())
+    )
+
+
+# -----------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    main()
