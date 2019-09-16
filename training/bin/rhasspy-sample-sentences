@@ -16,6 +16,7 @@ DEFINE_string 'profile' '' 'Path to profile directory' 'p'
 DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
 DEFINE_integer 'samples' 0 'Number of samples to generate and train on' 's'
 DEFINE_boolean 'meta' false 'Include meta labels in the sentences' 'm'
+DEFINE_boolean 'substitute' true 'Do text/tag substitutions'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -33,6 +34,10 @@ samples="${FLAGS_samples}"
 
 if [[ "${FLAGS_meta}" -eq "${FLAGS_TRUE}" ]]; then
     meta='true'
+fi
+
+if [[ "${FLAGS_substitute}" -eq "${FLAGS_TRUE}" ]]; then
+    substitute='true'
 fi
 
 # -----------------------------------------------------------------------------
@@ -71,10 +76,27 @@ else
     }
 fi
 
+# Strip meta __label__, __begin__, __end__ tags
 if [[ -z "${meta}" ]]; then
-    # Strip __meta__ tags
-    generate | \
+    function strip_meta {
+        # Strip __meta__ tags
         sed -e 's/\b__[^_]\+__[^ ]\+\s*//g'
+    }
 else
-    generate
+    function strip_meta {
+        cat
+    }
 fi
+
+# Text/tag substitutions
+if [[ -z "${substitute}" ]]; then
+    function substitute {
+        cat
+    }
+else
+    function substitute {
+        sed -e 's/\b[^: ]\+://g'
+    }
+fi
+
+generate | substitute | strip_meta

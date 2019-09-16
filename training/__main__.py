@@ -60,6 +60,13 @@ def ppath(query: str, default: str) -> Path:
 intent_whitelist = ppath("training.intent-whitelist", "intent_whitelist")
 sentences_ini = ppath("training.sentences-file", "sentences.ini")
 base_dictionary = ppath("training.base-dictionary", "base_dictionary.txt")
+base_language_model = ppath("training.base-language-model", "base_language_model.txt")
+base_language_model_fst = ppath(
+    "training.base-language-model-fst", "base_language_model.fst"
+)
+base_language_model_weight = pydash.get(
+    profile, "training.base-language-model-weight", None
+)
 custom_words = ppath("training.custom-words-file", "custom_words.txt")
 g2p_model = ppath("training.grapheme-to-phoneme-model", "g2p.fst")
 kaldi_dir = Path(os.getenv("kaldi_dir") or "/opt/kaldi")
@@ -237,6 +244,15 @@ def task_intent_fst():
 
 def task_language_model():
     """Creates an ARPA language model from intent.fst."""
+
+    if base_language_model_weight is not None:
+        yield {
+            "name": "base_lm_to_fst",
+            "file_dep": [base_language_model],
+            "targets": [base_language_model_fst],
+            "actions": ["ngramread --ARPA %(dependencies)s %(targets)s"],
+        }
+
     # FST -> n-gram counts
     intent_counts = str(intent_fst) + ".counts"
     yield {
@@ -254,6 +270,21 @@ def task_language_model():
         "targets": [intent_model],
         "actions": ["ngrammake %(dependencies)s %(targets)s"],
     }
+
+    if base_language_model_weight is not None:
+        merged_model = str(intent_model) + ".merge"
+
+        # merge
+        yield {
+            "name": "lm_merge",
+            "file_dep": [base_language_model_fst, intent_model],
+            "targets": [merged_model],
+            "actions": [
+                f"ngrammerge --alpha={base_language_model_weight} %(dependencies)s %(targets)s"
+            ],
+        }
+
+        intent_model = merged_model
 
     # model -> ARPA
     yield {

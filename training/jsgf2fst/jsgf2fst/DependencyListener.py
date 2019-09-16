@@ -18,7 +18,7 @@ from .JsgfParserListener import JsgfParserListener
 
 
 class DependencyListener(JsgfParserListener):
-    def __init__(self):
+    def __init__(self, eps="<eps>"):
         # State
         self.grammar_name: Optional[str] = None
         self.in_rule: bool = False
@@ -27,6 +27,7 @@ class DependencyListener(JsgfParserListener):
         self.reference_name: Optional[str] = None
         self.reference_grammar: Optional[str] = None
         self.tag_name: Optional[str] = None
+        self.tag_substitution: Optional[str] = None
         self.literal_text: Optional[str] = None
         self.literal_words: List[Tuple[str, str]] = []
 
@@ -36,6 +37,7 @@ class DependencyListener(JsgfParserListener):
         # Symbol tables
         self.input_symbols = fst.SymbolTable()
         self.output_symbols = fst.SymbolTable()
+        self.eps = eps
 
     # -------------------------------------------------------------------------
 
@@ -102,6 +104,11 @@ class DependencyListener(JsgfParserListener):
 
     def enterTagBody(self, ctx):
         self.tag_name = self._get_text(ctx)
+        self.tag_substitution = None
+
+        if ":" in self.tag_name:
+            # Strip substitution out of tag name
+            self.tag_name, self.tag_substitution = self.tag_name.split(":", maxsplit=1)
 
         # --[__begin__TAG]-->
         begin_symbol = "__begin__" + self.tag_name
@@ -110,6 +117,9 @@ class DependencyListener(JsgfParserListener):
         # --[__end__TAG]-->
         end_symbol = "__end__" + self.tag_name
         output_idx = self.output_symbols.add_symbol(end_symbol)
+
+    def exitTagBody(self, ctx):
+        self.tag_substitution = None
 
     # -------------------------------------------------------------------------
     # Literals
@@ -126,6 +136,10 @@ class DependencyListener(JsgfParserListener):
         for word in re.split(r"\s+", literal_text):
             if ":" in word:
                 in_word = word.split(":", maxsplit=1)[0]
+
+                # Empty input word becomes <eps>
+                if len(in_word) == 0:
+                    in_word = self.eps
 
                 # NOTE: Entire word (with ":") is used as output
                 out_word = word

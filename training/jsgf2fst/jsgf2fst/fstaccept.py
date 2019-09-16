@@ -157,7 +157,9 @@ def symbols2intent(
                 if ":" in sym:
                     # Use replacement text
                     in_sym, out_sym = sym.split(":", maxsplit=1)
-                    tag_info.raw_symbols.append(in_sym)
+
+                    if len(in_sym.strip()) > 0:
+                        tag_info.raw_symbols.append(in_sym)
 
                     if len(out_sym.strip()) > 0:
                         # Ignore empty output symbols
@@ -171,7 +173,9 @@ def symbols2intent(
             if ":" in sym:
                 # Use replacement symbol
                 in_sym, out_sym = sym.split(":", maxsplit=1)
-                raw_symbols.append(in_sym)
+
+                if len(in_sym.strip()) > 0:
+                    raw_symbols.append(in_sym)
 
                 if len(out_sym.strip()) > 0:
                     # Ignore empty output symbols

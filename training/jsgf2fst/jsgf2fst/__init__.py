@@ -77,7 +77,7 @@ def grammar_to_fsts(
     context = parser.r()
     walker = antlr4.ParseTreeWalker()
 
-    listener = FSTListener()
+    listener = FSTListener(eps=eps)
     walker.walk(listener, context)
 
     # Check for replacements
@@ -289,12 +289,16 @@ def _replace_fsts(
     # Copy symbols
     outer_input_symbols = outer_fst.input_symbols()
     for i in range(outer_input_symbols.num_symbols()):
-        input_symbol_map[i] = new_input_symbols.add_symbol(outer_input_symbols.find(i))
+        key = outer_input_symbols.get_nth_key(i)
+        input_symbol_map[key] = new_input_symbols.add_symbol(
+            outer_input_symbols.find(key)
+        )
 
     outer_output_symbols = outer_fst.output_symbols()
     for i in range(outer_output_symbols.num_symbols()):
-        output_symbol_map[i] = new_output_symbols.add_symbol(
-            outer_output_symbols.find(i)
+        key = outer_output_symbols.get_nth_key(i)
+        output_symbol_map[key] = new_output_symbols.add_symbol(
+            outer_output_symbols.find(key)
         )
 
     in_eps = new_input_symbols.add_symbol(eps)

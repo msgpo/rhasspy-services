@@ -1,6 +1,9 @@
 import re
-from collections import defaultdict
+import logging
+from collections import defaultdict, deque
 from typing import Optional, Dict, Set, List
+
+logger = logging.getLogger("FSTListener")
 
 import pywrapfst as fst
 
@@ -225,12 +228,34 @@ class FSTListener(DependencyListener):
         # --[__begin__TAG]-->
         begin_symbol = "__begin__" + self.tag_name
         output_idx = self.output_symbols.find(begin_symbol)
+        assert output_idx >= 0, f"{begin_symbol} not found"
 
         # Move outgoing anchor arcs
         for arc in self.fst.arcs(anchor_state):
             self.fst.add_arc(
                 next_state, fst.Arc(arc.ilabel, arc.olabel, arc.weight, arc.nextstate)
             )
+
+        # Patch all words inside the tag if there will be a substitution
+        if self.tag_substitution is not None:
+            state_queue = deque([next_state])
+            while len(state_queue) > 0:
+                state = state_queue.popleft()
+                mutable_arcs = self.fst.mutable_arcs(state)
+
+                # Modify arcs in-place
+                while not mutable_arcs.done():
+                    arc = mutable_arcs.value()
+
+                    # Create "WORD:" that will never output anything.
+                    # Substitution token is added later below.
+                    output_symbol = self.output_symbols.find(arc.olabel).decode()
+                    arc.olabel = self.output_symbols.add_symbol(output_symbol + ":")
+                    state_queue.append(arc.nextstate)
+
+                    # Update arc in-place
+                    mutable_arcs.set_value(arc)
+                    mutable_arcs.next()
 
         # Patch anchor
         self.fst.delete_arcs(anchor_state)
@@ -242,9 +267,22 @@ class FSTListener(DependencyListener):
         last_state = self.last_states[self.rule_name]
         next_state = self.fst.add_state()
 
+        # Output tag substitution, if present
+        if self.tag_substitution is not None:
+            # Create ":WORD" that will always output at the end of the tag body
+            output_idx = self.output_symbols.add_symbol(":" + self.tag_substitution)
+            self.fst.add_arc(
+                last_state,
+                fst.Arc(self.in_eps, output_idx, self.weight_one, next_state),
+            )
+
+            last_state = next_state
+            next_state = self.fst.add_state()
+
         # --[__end__TAG]-->
         end_symbol = "__end__" + self.tag_name
         output_idx = self.output_symbols.find(end_symbol)
+        assert output_idx >= 0, f"{end_symbol} not found"
 
         self.fst.add_arc(
             last_state, fst.Arc(self.in_eps, output_idx, self.weight_one, next_state)

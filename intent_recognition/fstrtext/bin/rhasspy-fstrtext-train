@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# Profile wrapper around rhasspy-fsticuffs
-
 if [[ -z "${rhasspy_dir}" ]]; then
     export rhasspy_dir='/usr/lib/rhasspy'
 fi
@@ -16,8 +14,8 @@ fi
 DEFINE_string 'intent-fst' '' 'Path to intent finite state transducer'
 DEFINE_string 'slot-fst' '' 'Path to write slot acceptor'
 DEFINE_string 'model-path' '' 'Path to write fasttext model'
-DEFINE_string 'text-path' '' 'Path to write sampled sentences'
-DEFINE_integer 'samples' 0 'Number of samples to generate and train on'
+DEFINE_string 'sentences-path' '' 'Path to write sampled sentences'
+DEFINE_integer 'samples' -1 'Number of samples to generate and train on'
 
 FLAGS "$@" || exit $?
 eval set -- "${FLAGS_ARGV}"
@@ -31,7 +29,7 @@ set -e
 intent_fst="${FLAGS_intent_fst}"
 slot_fst="${FLAGS_slot_fst}"
 model_path="${FLAGS_model_path}"
-text_path="${FLAGS_text_path}"
+sentences_path="${FLAGS_sentences_path}"
 samples="${FLAGS_samples}"
 
 # -----------------------------------------------------------------------------
@@ -53,14 +51,29 @@ if [[ -z "${model_path}" ]]; then
     exit 1
 fi
 
-if [[ "${samples}" == 0 ]]; then
-    echo '--samples is required'
-    exit 1
-fi
-
 # -----------------------------------------------------------------------------
 
-if [[ -z "${text_path}" ]]; then
+set -e
+
+# Create slot acceptor
+python3 -m intent_recognition.fstrtext.fstrtext_train \
+        --intent-fst "${intent_fst}" \
+        --slot-fst "${slot_fst}"
+
+if [[ "${samples}" == '-1' ]]; then
+    # Expecting sentences as input
+    if [[ -z "${sentences}_path"]];
+    then
+       sentences_path='/dev/stdin'
+    fi
+
+    function generate {
+        cat "${sentences_path}"
+    }
+else
+    # Sampling sentences
+
+if [[ -z "${sentences_path}" ]]; then
     # Use temp file
     text_path="$(mktemp)"
     function cleanup {
@@ -72,12 +85,6 @@ fi
 
 # -----------------------------------------------------------------------------
 
-set -e
-
-# Create slot acceptor
-python3 -m intent_recognition.fstrtext.fstrtext_train \
-        --intent-fst "${intent_fst}" \
-        --slot-fst "${slot_fst}"
 
 echo "Wrote slot FST to ${slot_fst}"
 
