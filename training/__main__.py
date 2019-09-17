@@ -2,6 +2,7 @@
 import os
 import re
 import sys
+import json
 import argparse
 import logging
 from pathlib import Path
@@ -11,6 +12,7 @@ from collections import deque
 import yaml
 import pydash
 import pywrapfst as fst
+import networkx as nx
 import doit
 from doit import create_after
 
@@ -25,7 +27,7 @@ from training.ini_jsgf import make_grammars
 from training.vocab_dict import make_dict
 
 logger = logging.getLogger("rhasspy_train")
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 # -----------------------------------------------------------------------------
 
@@ -167,22 +169,50 @@ def do_grammar_to_fsts(grammar_path: Path, replace_fst_paths: Dict[str, Path], t
 # -----------------------------------------------------------------------------
 
 
+def do_grammar_dependencies(grammar_path: Path, targets):
+    grammar = grammar_path.read_text()
+    grammar_deps = get_grammar_dependencies(grammar).graph
+    graph_json = nx.readwrite.json_graph.node_link_data(grammar_deps)
+    with open(targets[0], "w") as graph_file:
+        json.dump(graph_json, graph_file)
+
+
 @create_after(executed="grammars")
+def task_grammar_dependencies():
+    """Creates grammar dependency graphs from JSGF grammars and relevant slots."""
+
+    for intent in intents:
+        grammar_path = grammar_dir / f"{intent}.gram"
+        yield {
+            "name": intent + "_dependencies",
+            "file_dep": [grammar_path],
+            "targets": [str(grammar_path) + ".json"],
+            "actions": [(do_grammar_dependencies, [grammar_path])],
+        }
+
+
+# -----------------------------------------------------------------------------
+
+
+@create_after(executed="grammar_dependencies")
 def task_grammar_fsts():
     """Creates grammar FSTs from JSGF grammars and relevant slots."""
-    tasks = []
     used_slots: Set[str] = set()
 
     for intent in intents:
         grammar_path = grammar_dir / f"{intent}.gram"
-        grammar = grammar_path.read_text()
-        grammar_deps = get_grammar_dependencies(grammar)
+        grammar_dep_path = str(grammar_path) + ".json"
+
+        # Load dependency graph
+        with open(grammar_dep_path, "r") as graph_file:
+            graph_data = json.load(graph_file)
+            grammar_deps = nx.readwrite.json_graph.node_link_graph(graph_data)
 
         rule_names: Set[str] = set()
         replace_fst_paths: Dict[str, Path] = {}
 
         # Process dependencies
-        for node, data in grammar_deps.graph.nodes(data=True):
+        for node, data in grammar_deps.nodes(data=True):
             node_type = data["type"]
 
             if node_type == "slot":
@@ -204,7 +234,8 @@ def task_grammar_fsts():
 
         yield {
             "name": intent + "_fst",
-            "file_dep": [grammar_path] + list(replace_fst_paths.values()),
+            "file_dep": [grammar_path, grammar_dep_path]
+            + list(replace_fst_paths.values()),
             "targets": grammar_fst_paths,
             "actions": [(do_grammar_to_fsts, [grammar_path, replace_fst_paths])],
         }
