@@ -189,7 +189,11 @@ def main():
                         # Fast (strict) search
                         intent = recognize(intent_fst, text, known_tokens)
 
-                    send_event(EVENT_RECOGNIZED + request_id, intent)
+                    # Overwrite fields in original event
+                    for key, value in intent.items():
+                        event_dict[key] = value
+
+                    send_event(EVENT_RECOGNIZED + request_id, event_dict)
                 elif base_topic == EVENT_RELOAD:
                     logging.debug("Reloading intent FST")
 
@@ -205,9 +209,11 @@ def main():
         # Read JSON or text line-by-line
         for line in sys.stdin:
             if args.text_input:
-                text = line
+                event_dict = { "text": line }
             else:
-                text = maybe_object(line).get("text", "")
+                event_dict = maybe_object(line)
+
+            text = event_dict.get("text", "")
 
             if args.lower:
                 text = text.lower()
@@ -224,7 +230,11 @@ def main():
                 # Fast (strict) search
                 intent = recognize(intent_fst, text, known_tokens)
 
-            send_event(None, intent)
+            # Overwrite fields in original event
+            for key, value in intent.items():
+                event_dict[key] = value
+
+            send_event(None, event_dict)
 
 
 # -------------------------------------------------------------------------------------------------

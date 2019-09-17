@@ -30,9 +30,10 @@ def make_dict(
     # Read dictionaries
     word_dict: Dict[str, List[str]] = {}
     for dict_path in dictionary_paths:
-        logger.debug(f"Loading dictionary from {dict_path}")
-        with open(dict_path, "r") as dict_file:
-            read_dict(dict_file, word_dict, transform)
+        if os.path.exists(dict_path):
+            logger.debug(f"Loading dictionary from {dict_path}")
+            with open(dict_path, "r") as dict_file:
+                read_dict(dict_file, word_dict, transform)
 
     # Resolve vocabulary
     words_needed: Set[str] = set()

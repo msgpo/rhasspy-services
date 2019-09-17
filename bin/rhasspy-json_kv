@@ -9,14 +9,29 @@ def main():
     parser.add_argument(
         "--delimiter", "-d", default=" ", help="Delimiter between keys and values"
     )
+    parser.add_argument(
+        "--key",
+        "-k",
+        default=None,
+        help="Get key from JSON object field instead of first token",
+    )
     args = parser.parse_args()
 
     obj = {}
     for line in sys.stdin:
-        key, value = line.split(args.delimiter, maxsplit=1)
-        obj[key] = json.loads(value)
+        if args.key is None:
+            # key JSON input
+            key, value = line.split(args.delimiter, maxsplit=1)
+            value = json.loads(value)
+        else:
+            # JSON input
+            value = json.loads(line)
+            key = value[args.key]
+
+        obj[key] = value
 
     json.dump(obj, sys.stdout, indent=4)
+
 
 # -----------------------------------------------------------------------------
 

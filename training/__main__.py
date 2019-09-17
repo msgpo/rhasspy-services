@@ -357,6 +357,8 @@ def task_vocab_dict():
     if custom_words.exists():
         dictionary_paths.append(custom_words)
 
+    dictionary_paths = [p for p in dictionary_paths if p.exists()]
+
     return {
         "file_dep": [vocab] + dictionary_paths,
         "targets": [dictionary],
@@ -370,7 +372,7 @@ def task_vocab_dict():
 @create_after(executed="vocab_dict")
 def task_vocab_g2p():
     """Guesses the pronunciations of unknown words."""
-    if unknown_words.exists():
+    if unknown_words.exists() and g2p_model.exists():
         return {
             "file_dep": [unknown_words, g2p_model],
             "targets": [guess_words],
