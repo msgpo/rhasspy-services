@@ -219,7 +219,6 @@ def fstprintall(
 
     while len(state_queue) > 0:
         state, sentence = state_queue.popleft()
-        print(state, sentence)
         if state in visited_states:
             continue
 
