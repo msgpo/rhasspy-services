@@ -206,10 +206,11 @@ def fstprintall(
     in_fst: fst.Fst,
     out_file: Optional[TextIO] = None,
     exclude_meta: bool = True,
-    out_eps: int = 0,
+    eps: str = "<eps>",
 ) -> List[List[str]]:
     sentences = []
     output_symbols = in_fst.output_symbols()
+    out_eps = output_symbols.find(eps)
     zero_weight = fst.Weight.Zero(in_fst.weight_type())
     visited_states = set()
 
@@ -218,6 +219,7 @@ def fstprintall(
 
     while len(state_queue) > 0:
         state, sentence = state_queue.popleft()
+        print(state, sentence)
         if state in visited_states:
             continue
 
@@ -225,19 +227,20 @@ def fstprintall(
 
         if in_fst.final(state) != zero_weight:
             if out_file:
-                print("", file=out_file)
+                print(" ".join(sentence), file=out_file)
             else:
                 sentences.append(sentence)
 
         for arc in in_fst.arcs(state):
+            arc_sentence = list(sentence)
             if arc.olabel != out_eps:
                 out_symbol = output_symbols.find(arc.olabel).decode()
                 if exclude_meta and out_symbol.startswith("__"):
                     pass  # skip __label__, etc.
                 else:
-                    sentence.append(out_symbol)
+                    arc_sentence.append(out_symbol)
 
-            state_queue.append((arc.nextstate, list(sentence)))
+            state_queue.append((arc.nextstate, arc_sentence))
 
     return sentences
 
